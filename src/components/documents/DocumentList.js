@@ -87,6 +87,31 @@ const DocumentList = ({
     }
     onDocumentClick && onDocumentClick(document);
   };
+
+  const handleEditDocument = (document) => {
+    // TODO: Implement document edit functionality
+    console.log('Edit document:', document);
+  };
+
+  const handleDeleteDocument = async (document) => {
+    if (window.confirm(`Are you sure you want to delete "${document.name}"?`)) {
+      try {
+        const token = localStorage.getItem('gts_token');
+        await axios.delete(`${API_URL}/documents/${document._id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        onRefresh && onRefresh();
+      } catch (error) {
+        console.error('Error deleting document:', error);
+        // TODO: Show error notification
+      }
+    }
+  };
+
+  const handleShareDocument = (document) => {
+    // TODO: Implement document sharing
+    console.log('Share document:', document);
+  };
   
   const handleDownload = async (document) => {
     try {
@@ -206,6 +231,9 @@ const DocumentList = ({
           onClose={() => setPreviewDocument(null)}
           document={previewDocument}
           onDownload={handleDownload}
+          onEdit={handleEditDocument}
+          onDelete={handleDeleteDocument}
+          onShare={handleShareDocument}
         />
       )}
       {/* Folders */}

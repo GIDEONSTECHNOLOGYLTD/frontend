@@ -1,19 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
-  DialogContent,
   DialogTitle,
+  DialogContent,
   IconButton,
   Box,
+  CircularProgress,
   Typography,
-  CircularProgress
+  Tooltip,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Divider
 } from '@mui/material';
-import { Close, Download, Fullscreen, FullscreenExit } from '@mui/icons-material';
+import { 
+  Close as CloseIcon, 
+  Fullscreen as FullscreenIcon, 
+  Download as DownloadIcon,
+  MoreVert as MoreVertIcon,
+  History as HistoryIcon,
+  Share as ShareIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
+import DocumentVersionHistory from './DocumentVersionHistory';
 
-const DocumentPreview = ({ open, onClose, document, onDownload }) => {
-  const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
-  const [previewContent, setPreviewContent] = React.useState(null);
+const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete, onShare }) => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [previewContent, setPreviewContent] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
 
   React.useEffect(() => {
     if (!open || !document) return;
@@ -48,6 +66,48 @@ const DocumentPreview = ({ open, onClose, document, onDownload }) => {
       }
     };
   }, [open, document, previewContent]);
+
+  const handleMenuClick = (event) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleVersionHistoryOpen = () => {
+    setShowVersionHistory(true);
+    handleMenuClose();
+  };
+
+  const handleVersionHistoryClose = () => {
+    setShowVersionHistory(false);
+  };
+
+  const handleEdit = () => {
+    handleMenuClose();
+    onEdit && onEdit();
+  };
+
+  const handleDelete = () => {
+    handleMenuClose();
+    onDelete && onDelete();
+  };
+
+  const handleShare = () => {
+    handleMenuClose();
+    onShare && onShare();
+  };
+
+  // Clean up object URLs on unmount or when document changes
+  useEffect(() => {
+    return () => {
+      if (previewContent) {
+        URL.revokeObjectURL(previewContent);
+      }
+    };
+  }, [previewContent]);
 
   if (!document) return null;
 
@@ -128,22 +188,64 @@ const DocumentPreview = ({ open, onClose, document, onDownload }) => {
         borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
         padding: '8px 16px 8px 24px'
       }}>
-        <Typography variant="h6" noWrap>
-          {document.name}
-        </Typography>
-        <Box>
-          <IconButton onClick={() => onDownload(document)} title="Download">
-            <Download />
-          </IconButton>
-          <IconButton 
-            onClick={() => setIsFullscreen(!isFullscreen)} 
-            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          >
-            {isFullscreen ? <FullscreenExit /> : <Fullscreen />}
-          </IconButton>
-          <IconButton onClick={onClose} title="Close">
-            <Close />
-          </IconButton>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">{document?.name}</Typography>
+          <Box display="flex" alignItems="center">
+            <Tooltip title="Download">
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDownload(document);
+                }}
+                color="primary"
+                sx={{ mr: 1 }}
+              >
+                <DownloadIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Version History">
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleVersionHistoryOpen();
+                }}
+                color="primary"
+                sx={{ mr: 1 }}
+              >
+                <HistoryIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="More actions">
+              <IconButton
+                onClick={handleMenuClick}
+                color="primary"
+                sx={{ mr: 1 }}
+              >
+                <MoreVertIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsFullscreen(!isFullscreen);
+                }}
+                color="primary"
+                sx={{ mr: 1 }}
+              >
+                <FullscreenIcon />
+              </IconButton>
+            </Tooltip>
+            <IconButton 
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }} 
+              color="primary"
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
         </Box>
       </DialogTitle>
       <DialogContent sx={{ 
@@ -155,6 +257,49 @@ const DocumentPreview = ({ open, onClose, document, onDownload }) => {
       }}>
         {renderPreview()}
       </DialogContent>
+      
+      {/* Document actions menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <MenuItem onClick={handleEdit}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit Document</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleShare}>
+          <ListItemIcon>
+            <ShareIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Share</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleVersionHistoryOpen}>
+          <ListItemIcon>
+            <HistoryIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Version History</ListItemText>
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
+          <ListItemIcon sx={{ color: 'error.main' }}>
+            <DeleteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
+      
+      {/* Version History Dialog */}
+      {document && (
+        <DocumentVersionHistory
+          document={document}
+          open={showVersionHistory}
+          onClose={handleVersionHistoryClose}
+        />
+      )}
     </Dialog>
   );
 };
