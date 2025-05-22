@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import { API_URL } from '../../config';
@@ -14,7 +14,8 @@ import {
   CircularProgress,
   Card,
   CardActionArea,
-  Chip
+  Chip,
+  Tooltip
 } from '@mui/material';
 
 // Icons
@@ -25,6 +26,10 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import ShareIcon from '@mui/icons-material/Share';
 import DownloadIcon from '@mui/icons-material/Download';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+
+// Components
+import DocumentPreview from './DocumentPreview';
 
 const DocumentList = ({
   documents = [],
@@ -35,8 +40,9 @@ const DocumentList = ({
   currentFolder = null,
   loading = false
 }) => {
-  const [anchorEl, setAnchorEl] = React.useState(null);
-  const [selectedItem, setSelectedItem] = React.useState(null);
+  const [previewDocument, setPreviewDocument] = useState(null);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
   
   // Handle loading state
   if (loading) {
@@ -71,6 +77,37 @@ const DocumentList = ({
     const handleMenuClose = () => {
     setAnchorEl(null);
     setSelectedItem(null);
+  };
+
+  const handleDocumentClick = (document) => {
+    // Open preview for supported file types
+    const supportedTypes = ['image/', 'application/pdf'];
+    if (supportedTypes.some(type => document.fileType.startsWith(type))) {
+      setPreviewDocument(document);
+    }
+    onDocumentClick && onDocumentClick(document);
+  };
+  
+  const handleDownload = async (document) => {
+    try {
+      const token = localStorage.getItem('gts_token');
+      const response = await axios.get(`${API_URL}/documents/${document._id}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', document.name);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      // TODO: Show error notification
+    }
   };
 
   const handleAction = async (action) => {
@@ -162,6 +199,15 @@ const DocumentList = ({
 
   return (
     <Box>
+      {/* Document Preview Modal */}
+      {previewDocument && (
+        <DocumentPreview
+          open={!!previewDocument}
+          onClose={() => setPreviewDocument(null)}
+          document={previewDocument}
+          onDownload={handleDownload}
+        />
+      )}
       {/* Folders */}
       {folders.length > 0 && (
         <Box mb={4}>
@@ -188,9 +234,16 @@ const DocumentList = ({
                     <Box display="flex" alignItems="center">
                       <FolderIcon color="primary" sx={{ fontSize: 40, mr: 2 }} />
                       <Box flexGrow={1}>
-                        <Typography variant="subtitle1" noWrap>
-                          {folder.name}
-                        </Typography>
+                        <Box display="flex" alignItems="center">
+                          <Typography variant="subtitle1" noWrap>
+                            {folder.name}
+                          </Typography>
+                          {folder.fileType.startsWith('image/') || folder.fileType === 'application/pdf' ? (
+                            <Tooltip title="Click to preview">
+                              <VisibilityIcon color="action" fontSize="small" sx={{ ml: 1, opacity: 0.7 }} />
+                            </Tooltip>
+                          ) : null}
+                        </Box>
                         <Typography variant="body2" color="textSecondary">
                           {folder.documentCount || 0} items
                         </Typography>
@@ -230,7 +283,7 @@ const DocumentList = ({
                       cursor: 'pointer',
                     },
                   }}
-                  onClick={() => onDocumentClick && onDocumentClick(doc)}
+                  onClick={() => handleDocumentClick(doc)}
                 >
                   <CardActionArea sx={{ flexGrow: 1, p: 2 }}>
                     <Box display="flex" alignItems="center">
@@ -238,6 +291,16 @@ const DocumentList = ({
                         {getFileIcon(doc.fileType)}
                       </Box>
                       <Box flexGrow={1} minWidth={0}>
+                        <Box display="flex" alignItems="center">
+                          <Typography variant="subtitle1" noWrap>
+                            {doc.name}
+                          </Typography>
+                          {doc.fileType.startsWith('image/') || doc.fileType === 'application/pdf' ? (
+                            <Tooltip title="Click to preview">
+                              <VisibilityIcon color="action" fontSize="small" sx={{ ml: 1, opacity: 0.7 }} />
+                            </Tooltip>
+                          ) : null}
+                        </Box>
                         <Typography variant="subtitle1" noWrap>
                           {doc.name}
                         </Typography>
