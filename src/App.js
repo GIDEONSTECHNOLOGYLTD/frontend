@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './context/auth/AuthContext';
+import { WebSocketProvider } from './context/WebSocketContext';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import Dashboard from './components/Dashboard';
@@ -28,7 +29,7 @@ const theme = createTheme({
       '-apple-system',
       'BlinkMacSystemFont',
       '"Segoe UI"',
-      'Roboto"',
+      'Roboto',
       '"Helvetica Neue"',
       'Arial',
       'sans-serif',
@@ -47,46 +48,48 @@ const AppLayout = ({ children }) => {
 // Main App component with routing
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>
-        <Router>
-          <div className="App">
-            <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              
-              {/* Protected routes */}
-              <Route element={<PrivateRoute />}>
-                {/* Dashboard route */}
-                <Route 
-                  path="/" 
-                  element={
-                    <AppLayout>
-                      <Dashboard />
-                    </AppLayout>
-                  } 
-                />
+    <WebSocketProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider>
+          <Router>
+            <div className="App">
+              <Routes>
+                {/* Public routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
                 
-                {/* Tasks routes */}
-                <Route 
-                  path="/tasks/*" 
-                  element={
-                    <AppLayout>
-                      <TaskRoutes />
-                    </AppLayout>
-                  } 
-                />
-                
-                {/* Fallback route */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Route>
-            </Routes>
-          </div>
-        </Router>
-      </AuthProvider>
-    </ThemeProvider>
+                {/* Protected routes */}
+                <Route element={<PrivateRoute />}>
+                  {/* Dashboard route */}
+                  <Route 
+                    path="/" 
+                    element={
+                      <AppLayout>
+                        <Dashboard />
+                      </AppLayout>
+                    } 
+                  />
+                  
+                  {/* Tasks routes */}
+                  <Route 
+                    path="/tasks/*" 
+                    element={
+                      <AppLayout>
+                        <TaskRoutes />
+                      </AppLayout>
+                    } 
+                  />
+                  
+                  {/* Fallback route */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Routes>
+            </div>
+          </Router>
+        </AuthProvider>
+      </ThemeProvider>
+    </WebSocketProvider>
   );
 }
 

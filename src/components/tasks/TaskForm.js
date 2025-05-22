@@ -1,131 +1,147 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Button, 
-  TextField, 
-  Typography, 
-  Paper, 
-  Grid, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useWebSocket } from '../../context/WebSocketContext';
+import { useAuth } from '../../context/AuthContext';
+import axios from 'axios';
+import { API_URL } from '../../config';
+// Material-UI components
+import {
+  Typography,
+  TextField,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Grid,
+  Paper,
+  Box,
+  Chip,
+  Divider,
+  Alert,
+  IconButton,
+  InputAdornment,
   FormHelperText,
   CircularProgress,
-  Divider,
-  FormControlLabel,
   Switch,
-  InputAdornment,
-  IconButton,
-  Tooltip
+  Avatar
 } from '@mui/material';
-import { 
-  Save as SaveIcon, 
-  ArrowBack as ArrowBackIcon,
-  Today as TodayIcon,
-  Description as DescriptionIcon,
-  LowPriority as PriorityIcon,
-  AssignmentInd as AssigneeIcon,
-  Category as ProjectIcon
-} from '@mui/icons-material';
+
+// Icons
+import SaveIcon from '@mui/icons-material/Save';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import DescriptionIcon from '@mui/icons-material/Description';
+import CategoryIcon from '@mui/icons-material/Category';
+import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
+import LowPriorityIcon from '@mui/icons-material/LowPriority';
+
+// Date picker components
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/auth/AuthContext';
-import axios from 'axios';
-import { API_URL } from '../../config';
+
+// Component aliases for consistency
+const ProjectIcon = CategoryIcon;
+const AssigneeIcon = AssignmentIndIcon;
+const PriorityIcon = LowPriorityIcon;
 
 const TaskForm = () => {
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
   
-  const [loading, setLoading] = useState(isEditMode);
-  const [submitting, setSubmitting] = useState(false);
-  const [projects, setProjects] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
-  
+  const [loading, setLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    projectId: '',
     status: 'pending',
     priority: 'medium',
     dueDate: null,
     assignedTo: '',
-    estimatedHours: '',
+    project: '',
+    estimatedHours: 0,
+    tags: [],
     isBillable: false,
-    tags: []
+    attachments: []
   });
+  const [submitError, setSubmitError] = useState('');
+  const socket = useWebSocket();
 
-  const [errors, setErrors] = useState({});
+  const [projects, setProjects] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
 
-  useEffect(() => {
-    fetchFormData();
-    
-    if (isEditMode) {
-      fetchTask();
-    }
-  }, [id]);
-
-  const fetchFormData = async () => {
+  const fetchTask = useCallback(async (taskId) => {
     try {
       const token = localStorage.getItem('gts_token');
-      const [projectsRes, teamRes] = await Promise.all([
-        axios.get(`${API_URL}/projects`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        axios.get(`${API_URL}/users/team`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
-      
-      setProjects(projectsRes.data.data || []);
-      setTeamMembers(teamRes.data.data || []);
-
-      // Set project from URL state if available
-      if (location.state?.projectId) {
-        setFormData(prev => ({
-          ...prev,
-          projectId: location.state.projectId
-        }));
-      }
-    } catch (error) {
-      console.error('Error fetching form data:', error);
-    }
-  };
-
-  const fetchTask = async () => {
-    try {
-      const token = localStorage.getItem('gts_token');
-      const response = await axios.get(`${API_URL}/tasks/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await axios.get(`${API_URL}/tasks/${taskId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      const task = response.data.data;
+      const taskData = response.data.data;
       setFormData({
-        title: task.title,
-        description: task.description || '',
-        projectId: task.project?._id || '',
-        status: task.status || 'pending',
-        priority: task.priority || 'medium',
-        dueDate: task.dueDate ? new Date(task.dueDate) : null,
-        assignedTo: task.assignedTo?._id || '',
-        estimatedHours: task.estimatedHours || '',
-        isBillable: task.isBillable || false,
-        tags: task.tags || []
+        title: taskData.title,
+        description: taskData.description,
+        status: taskData.status,
+        priority: taskData.priority,
+        dueDate: taskData.dueDate ? new Date(taskData.dueDate) : null,
+        assignedTo: taskData.assignedTo || '',
+        project: taskData.project || '',
+        estimatedHours: taskData.estimatedHours || 0,
+        tags: taskData.tags || [],
+        isBillable: taskData.isBillable || false,
+        attachments: taskData.attachments || []
       });
     } catch (error) {
       console.error('Error fetching task:', error);
-    } finally {
-      setLoading(false);
+      setSubmitError('Failed to load task details');
     }
-  };
+  }, []);
+
+  const fetchTeamMembers = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('gts_token');
+      const response = await axios.get(`${API_URL}/users/team`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+      return [];
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchFormData = async () => {
+      try {
+        const token = localStorage.getItem('gts_token');
+        
+        // Fetch projects and team members in parallel
+        const [projectsRes, teamMembers] = await Promise.all([
+          axios.get(`${API_URL}/projects`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }),
+          fetchTeamMembers()
+        ]);
+        
+        setProjects(projectsRes.data.data || []);
+        setTeamMembers(teamMembers);
+
+        if (isEditMode && id) {
+          await fetchTask(id);
+        }
+      } catch (error) {
+        console.error('Error loading form data:', error);
+        setSubmitError('Failed to load form data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchFormData();
+  }, [id, isEditMode, fetchTask, fetchTeamMembers]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -135,8 +151,8 @@ const TaskForm = () => {
     }));
     
     // Clear error when field is edited
-    if (errors[name]) {
-      setErrors(prev => ({
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
         ...prev,
         [name]: null
       }));
@@ -169,7 +185,7 @@ const TaskForm = () => {
       newErrors.estimatedHours = 'Estimated hours must be a positive number';
     }
     
-    setErrors(newErrors);
+    setFormErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
@@ -180,61 +196,59 @@ const TaskForm = () => {
       return;
     }
     
+    setLoading(true);
+    setFormErrors({});
+    setSubmitError('');
+    
     try {
-      setSubmitting(true);
       const token = localStorage.getItem('gts_token');
-      const payload = {
+      const url = isEditMode ? `${API_URL}/tasks/${id}` : `${API_URL}/tasks`;
+      const method = isEditMode ? 'put' : 'post';
+      
+      // Prepare task data
+      const taskData = {
         ...formData,
-        projectId: formData.projectId || undefined,
-        assignedTo: formData.assignedTo || undefined,
-        estimatedHours: formData.estimatedHours || undefined,
-        dueDate: formData.dueDate ? formData.dueDate.toISOString() : undefined
+        dueDate: formData.dueDate ? formData.dueDate.toISOString() : null
       };
-
-      if (isEditMode) {
-        await axios.patch(
-          `${API_URL}/tasks/${id}`,
-          payload,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
+      
+      // Send request
+      const response = await axios[method](
+        url,
+        taskData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           }
-        );
-      } else {
-        await axios.post(
-          `${API_URL}/tasks`,
-          payload,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        }
+      );
+      
+      // Send WebSocket notification if task is assigned to someone
+      if (formData.assignedTo && formData.assignedTo.length > 0 && socket) {
+        const notification = {
+          type: 'TASK_ASSIGNED',
+          taskId: response.data.data._id,
+          taskTitle: formData.title,
+          assignedTo: formData.assignedTo,
+          assignedBy: user._id,
+          timestamp: new Date().toISOString()
+        };
+        
+        socket.send(JSON.stringify(notification));
       }
       
       navigate('/tasks');
-    } catch (error) {
-      console.error('Error saving task:', error);
-      if (error.response?.data?.errors) {
-        const apiErrors = {};
-        error.response.data.errors.forEach(err => {
-          apiErrors[err.param] = err.msg;
-        });
-        setErrors(apiErrors);
-      } else {
-        setErrors({ submit: error.response?.data?.message || 'Failed to save task' });
-      }
+    } catch (err) {
+      console.error('Error saving task:', err);
+      setSubmitError(err.response?.data?.message || 'Failed to save task. Please try again.');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
         <CircularProgress />
       </Box>
     );
@@ -264,18 +278,19 @@ const TaskForm = () => {
               type="submit"
               variant="contained"
               color="primary"
-              startIcon={submitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-              disabled={submitting}
+              startIcon={<SaveIcon />}
+              disabled={loading}
+              sx={{ mr: 2 }}
             >
-              {isEditMode ? 'Update' : 'Create'} Task
+              {loading ? 'Saving...' : 'Save Task'}
             </Button>
           </Box>
         </Box>
 
-        {errors.submit && (
-          <Box mb={3}>
-            <Typography color="error">{errors.submit}</Typography>
-          </Box>
+        {submitError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {submitError}
+          </Alert>
         )}
 
         <Grid container spacing={3}>
@@ -290,25 +305,24 @@ const TaskForm = () => {
               
               <Grid container spacing={2}>
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Title"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleChange}
-                    error={Boolean(errors.title)}
-                    helperText={errors.title}
-                    required
-                    variant="outlined"
-                    margin="normal"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <DescriptionIcon color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
+                  <FormControl fullWidth margin="normal" error={Boolean(formErrors.title)}>
+                    <TextField
+                      name="title"
+                      label="Title"
+                      value={formData.title}
+                      onChange={handleChange}
+                      required
+                      error={Boolean(formErrors.title)}
+                      helperText={formErrors.title}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <DescriptionIcon color="action" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </FormControl>
                 </Grid>
                 
                 <Grid item xs={12}>
@@ -318,8 +332,6 @@ const TaskForm = () => {
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
-                    error={Boolean(errors.description)}
-                    helperText={errors.description || 'Markdown is supported'}
                     multiline
                     rows={4}
                     variant="outlined"
@@ -328,11 +340,11 @@ const TaskForm = () => {
                 </Grid>
                 
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth margin="normal" error={Boolean(errors.projectId)}>
+                  <FormControl fullWidth margin="normal" error={Boolean(formErrors.project)}>
                     <InputLabel>Project</InputLabel>
                     <Select
-                      name="projectId"
-                      value={formData.projectId}
+                      name="project"
+                      value={formData.project}
                       onChange={handleChange}
                       label="Project"
                       startAdornment={
@@ -350,14 +362,14 @@ const TaskForm = () => {
                         </MenuItem>
                       ))}
                     </Select>
-                    {errors.projectId && (
-                      <FormHelperText>{errors.projectId}</FormHelperText>
+                    {formErrors.project && (
+                      <FormHelperText>{formErrors.project}</FormHelperText>
                     )}
                   </FormControl>
                 </Grid>
                 
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth margin="normal" error={Boolean(errors.assignedTo)}>
+                  <FormControl fullWidth margin="normal" error={Boolean(formErrors.assignedTo)}>
                     <InputLabel>Assigned To</InputLabel>
                     <Select
                       name="assignedTo"
@@ -379,14 +391,14 @@ const TaskForm = () => {
                         </MenuItem>
                       ))}
                     </Select>
-                    {errors.assignedTo && (
-                      <FormHelperText>{errors.assignedTo}</FormHelperText>
+                    {formErrors.assignedTo && (
+                      <FormHelperText>{formErrors.assignedTo}</FormHelperText>
                     )}
                   </FormControl>
                 </Grid>
                 
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth margin="normal" error={Boolean(errors.status)}>
+                  <FormControl fullWidth margin="normal" error={Boolean(formErrors.status)}>
                     <InputLabel>Status</InputLabel>
                     <Select
                       name="status"
@@ -399,14 +411,14 @@ const TaskForm = () => {
                       <MenuItem value="completed">Completed</MenuItem>
                       <MenuItem value="blocked">Blocked</MenuItem>
                     </Select>
-                    {errors.status && (
-                      <FormHelperText>{errors.status}</FormHelperText>
+                    {formErrors.status && (
+                      <FormHelperText>{formErrors.status}</FormHelperText>
                     )}
                   </FormControl>
                 </Grid>
                 
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth margin="normal" error={Boolean(errors.priority)}>
+                  <FormControl fullWidth margin="normal" error={Boolean(formErrors.priority)}>
                     <InputLabel>Priority</InputLabel>
                     <Select
                       name="priority"
@@ -423,14 +435,14 @@ const TaskForm = () => {
                       <MenuItem value="medium">Medium</MenuItem>
                       <MenuItem value="high">High</MenuItem>
                     </Select>
-                    {errors.priority && (
-                      <FormHelperText>{errors.priority}</FormHelperText>
+                    {formErrors.priority && (
+                      <FormHelperText>{formErrors.priority}</FormHelperText>
                     )}
                   </FormControl>
                 </Grid>
                 
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth margin="normal" error={Boolean(errors.dueDate)}>
+                  <FormControl fullWidth margin="normal" error={Boolean(formErrors.dueDate)}>
                     <DatePicker
                       label="Due Date"
                       value={formData.dueDate}
@@ -439,8 +451,8 @@ const TaskForm = () => {
                         <TextField 
                           {...params} 
                           fullWidth
-                          error={Boolean(errors.dueDate)}
-                          helperText={errors.dueDate}
+                          error={Boolean(formErrors.dueDate)}
+                          helperText={formErrors.dueDate}
                         />
                       )}
                     />
@@ -455,8 +467,8 @@ const TaskForm = () => {
                     type="number"
                     value={formData.estimatedHours}
                     onChange={handleChange}
-                    error={Boolean(errors.estimatedHours)}
-                    helperText={errors.estimatedHours}
+                    error={Boolean(formErrors.estimatedHours)}
+                    helperText={formErrors.estimatedHours}
                     margin="normal"
                     InputProps={{
                       inputProps: { min: 0, step: 0.5 },

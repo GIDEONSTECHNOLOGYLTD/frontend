@@ -25,7 +25,6 @@ import {
   MoreVert as MoreVertIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/auth/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../../config';
 
@@ -35,7 +34,6 @@ const TaskList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [anchorEl, setAnchorEl] = useState(null);
-  const { user } = useAuth();
   const navigate = useNavigate();
   const open = Boolean(anchorEl);
 
