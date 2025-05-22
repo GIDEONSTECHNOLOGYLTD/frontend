@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { searchDocuments, getSearchSuggestions } from '../services/api';
+import { 
+  searchDocuments, 
+  getSearchSuggestions, 
+  shareDocument as apiShareDocument,
+  getDocumentPermissions,
+  updateDocumentPermissions,
+  getDocumentVersions,
+  restoreDocumentVersion as apiRestoreDocumentVersion
+} from '../services/api';
 
 const SearchContext = createContext();
 
@@ -183,6 +191,58 @@ export const SearchProvider = ({ children }) => {
     [search, searchQuery]
   );
 
+  // Document sharing functions
+  const shareDocument = useCallback(async (documentId, email, permission) => {
+    try {
+      const response = await apiShareDocument(documentId, email, permission);
+      return response;
+    } catch (err) {
+      console.error('Error sharing document:', err);
+      throw err;
+    }
+  }, []);
+
+  const getDocumentSharing = useCallback(async (documentId) => {
+    try {
+      const response = await getDocumentPermissions(documentId);
+      return response;
+    } catch (err) {
+      console.error('Error getting document permissions:', err);
+      throw err;
+    }
+  }, []);
+
+  const updateDocumentSharing = useCallback(async (documentId, permissionId, permission) => {
+    try {
+      const response = await updateDocumentPermissions(documentId, permissionId, permission);
+      return response;
+    } catch (err) {
+      console.error('Error updating document permissions:', err);
+      throw err;
+    }
+  }, []);
+
+  // Version control functions
+  const getDocumentVersionsList = useCallback(async (documentId) => {
+    try {
+      const versions = await getDocumentVersions(documentId);
+      return versions;
+    } catch (err) {
+      console.error('Error getting document versions:', err);
+      throw err;
+    }
+  }, []);
+
+  const restoreDocumentVersion = useCallback(async (documentId, versionId) => {
+    try {
+      const response = await apiRestoreDocumentVersion(documentId, versionId);
+      return response;
+    } catch (err) {
+      console.error('Error restoring document version:', err);
+      throw err;
+    }
+  }, []);
+
   const value = {
     searchQuery,
     setSearchQuery: updateSearchQuery,
@@ -195,7 +255,12 @@ export const SearchProvider = ({ children }) => {
     error,
     search,
     fetchSuggestions,
-    goToPage
+    goToPage,
+    shareDocument,
+    getDocumentSharing,
+    updateDocumentSharing,
+    getDocumentVersions: getDocumentVersionsList,
+    restoreDocumentVersion
   };
 
   return (
