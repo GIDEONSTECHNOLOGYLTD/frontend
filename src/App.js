@@ -8,6 +8,7 @@ import Register from './components/auth/Register';
 import Dashboard from './components/Dashboard';
 import Layout from './components/layout/Layout';
 import PrivateRoute from './components/routing/PrivateRoute';
+import TaskRoutes from './routes/TaskRoutes';
 
 // Create a theme instance
 const theme = createTheme({
@@ -38,6 +39,12 @@ const theme = createTheme({
   },
 });
 
+// Main app layout with navigation
+const AppLayout = ({ children }) => {
+  return <Layout>{children}</Layout>;
+};
+
+// Main App component with routing
 function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -46,17 +53,35 @@ function App() {
         <Router>
           <div className="App">
             <Routes>
+              {/* Public routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              
+              {/* Protected routes */}
               <Route element={<PrivateRoute />}>
-                <Route path="/dashboard" element={
-                  <Layout>
-                    <Dashboard />
-                  </Layout>
-                } />
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                {/* Dashboard route */}
+                <Route 
+                  path="/" 
+                  element={
+                    <AppLayout>
+                      <Dashboard />
+                    </AppLayout>
+                  } 
+                />
+                
+                {/* Tasks routes */}
+                <Route 
+                  path="/tasks/*" 
+                  element={
+                    <AppLayout>
+                      <TaskRoutes />
+                    </AppLayout>
+                  } 
+                />
+                
+                {/* Fallback route */}
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
         </Router>
