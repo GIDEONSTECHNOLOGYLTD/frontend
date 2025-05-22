@@ -47,4 +47,29 @@ jest.mock('react-router-dom', () => ({
     state: null,
     key: 'test-key',
   }),
+  useParams: () => ({}),
+  useRouteMatch: () => ({}),
 }));
+
+// Mock axios
+jest.mock('axios');
+
+// Mock Material-UI components that cause issues in tests
+jest.mock('@mui/material', () => {
+  const original = jest.requireActual('@mui/material');
+  return {
+    ...original,
+    // Add any Material-UI components that need special handling
+    useMediaQuery: jest.fn().mockReturnValue(false),
+    useTheme: jest.fn().mockReturnValue({
+      breakpoints: { up: jest.fn().mockReturnValue(true) },
+      spacing: (value) => value * 8,
+    }),
+  };
+});
+
+// Mock document services using manual mock in __mocks__ directory
+jest.mock('@/services/documentService');
+
+// Mock window.URL.createObjectURL
+window.URL.createObjectURL = jest.fn();
