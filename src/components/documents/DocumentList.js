@@ -234,6 +234,10 @@ const DocumentList = ({
           onEdit={handleEditDocument}
           onDelete={handleDeleteDocument}
           onShare={handleShareDocument}
+          onDocumentUpdated={() => {
+            // Refresh the document list to reflect changes
+            onRefresh && onRefresh();
+          }}
         />
       )}
       {/* Folders */}

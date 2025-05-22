@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+// Redux dispatch is not currently used in this component
+import PropTypes from 'prop-types';
 import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
+  Button,
   IconButton,
   Box,
   CircularProgress,
@@ -12,7 +16,10 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
-  Divider
+  Divider,
+  Tabs,
+  Tab,
+  Paper
 } from '@mui/material';
 import { 
   Close as CloseIcon, 
@@ -25,15 +32,63 @@ import {
   Delete as DeleteIcon
 } from '@mui/icons-material';
 import DocumentVersionHistory from './DocumentVersionHistory';
+import ShareDocumentDialog from './ShareDocumentDialog';
+import TagManager from './TagManager';
 
-const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete, onShare }) => {
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`document-tabpanel-${index}`}
+      aria-labelledby={`document-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+TabPanel.propTypes = {
+  children: PropTypes.node,
+  index: PropTypes.number.isRequired,
+  value: PropTypes.number.isRequired,
+};
+
+function a11yProps(index) {
+  return {
+    id: `document-tab-${index}`,
+    'aria-controls': `document-tabpanel-${index}`,
+  };
+}
+
+const DocumentPreview = ({
+  open,
+  onClose,
+  document,
+  onDownload,
+  onEdit,
+  onDelete,
+  onShare,
+  onDocumentUpdated
+}) => {
+  const [tabValue, setTabValue] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [previewContent, setPreviewContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [error, setError] = useState('');
 
-  React.useEffect(() => {
+  // Load document preview
+  useEffect(() => {
     if (!open || !document) return;
     
     const loadPreview = async () => {
@@ -42,16 +97,15 @@ const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete
         const response = await fetch(document.fileUrl);
         const blob = await response.blob();
         
-        if (document.fileType.startsWith('image/')) {
-          setPreviewContent(URL.createObjectURL(blob));
-        } else if (document.fileType === 'application/pdf') {
+        if (document.fileType.startsWith('image/') || document.fileType === 'application/pdf') {
           setPreviewContent(URL.createObjectURL(blob));
         } else {
-          // For unsupported preview types
           setPreviewContent(null);
         }
-      } catch (error) {
-        console.error('Error loading preview:', error);
+        setError('');
+      } catch (err) {
+        console.error('Error loading preview:', err);
+        setError('Failed to load document preview');
         setPreviewContent(null);
       } finally {
         setLoading(false);
@@ -67,55 +121,67 @@ const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete
     };
   }, [open, document, previewContent]);
 
+  const handleDocumentUpdated = useCallback((updatedDocument) => {
+    if (onDocumentUpdated) {
+      onDocumentUpdated(updatedDocument);
+    }
+  }, [onDocumentUpdated]);
+
   const handleMenuClick = (event) => {
     event.stopPropagation();
     setAnchorEl(event.currentTarget);
   };
 
-  const handleMenuClose = () => {
+  const handleCloseMenu = () => {
     setAnchorEl(null);
+  };
+
+  const handleShareClick = () => {
+    setShowShareDialog(true);
+    handleCloseMenu();
+  };
+
+  const handleShareClose = () => {
+    setShowShareDialog(false);
   };
 
   const handleVersionHistoryOpen = () => {
     setShowVersionHistory(true);
-    handleMenuClose();
-  };
-
-  const handleVersionHistoryClose = () => {
-    setShowVersionHistory(false);
+    handleCloseMenu();
   };
 
   const handleEdit = () => {
-    handleMenuClose();
+    handleCloseMenu();
     onEdit && onEdit();
   };
 
   const handleDelete = () => {
-    handleMenuClose();
+    handleCloseMenu();
     onDelete && onDelete();
   };
 
-  const handleShare = () => {
-    handleMenuClose();
-    onShare && onShare();
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // Clean up object URLs on unmount or when document changes
-  useEffect(() => {
-    return () => {
-      if (previewContent) {
-        URL.revokeObjectURL(previewContent);
-      }
-    };
-  }, [previewContent]);
-
-  if (!document) return null;
-
-  const renderPreview = () => {
+  const renderDocumentContent = () => {
     if (loading) {
       return (
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
           <CircularProgress />
+        </Box>
+      );
+    }
+
+
+    if (error) {
+      return (
+        <Box textAlign="center" p={4}>
+          <Typography color="error">{error}</Typography>
         </Box>
       );
     }
@@ -136,11 +202,7 @@ const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete
           <img 
             src={previewContent} 
             alt={document.name}
-            style={{ 
-              maxWidth: '100%', 
-              maxHeight: '80vh',
-              objectFit: 'contain' 
-            }} 
+            style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
           />
         </Box>
       );
@@ -148,9 +210,9 @@ const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete
 
     if (document.fileType === 'application/pdf') {
       return (
-        <Box width="100%" height="80vh">
+        <Box height="70vh">
           <iframe
-            src={`${previewContent}#view=fitH`}
+            src={previewContent}
             title={document.name}
             width="100%"
             height="100%"
@@ -160,14 +222,22 @@ const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete
       );
     }
 
-    return null;
+    return (
+      <Box p={2}>
+        <Typography variant="body1">
+          Preview not available for this file type.
+        </Typography>
+      </Box>
+    );
   };
 
+  if (!document) return null;
+
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="lg"
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="md" 
       fullWidth
       fullScreen={isFullscreen}
       PaperProps={{
@@ -188,82 +258,207 @@ const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete
         borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
         padding: '8px 16px 8px 24px'
       }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">{document?.name}</Typography>
-          <Box display="flex" alignItems="center">
-            <Tooltip title="Download">
-              <IconButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDownload(document);
-                }}
-                color="primary"
-                sx={{ mr: 1 }}
-              >
-                <DownloadIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Version History">
-              <IconButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleVersionHistoryOpen();
-                }}
-                color="primary"
-                sx={{ mr: 1 }}
-              >
-                <HistoryIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="More actions">
-              <IconButton
-                onClick={handleMenuClick}
-                color="primary"
-                sx={{ mr: 1 }}
-              >
-                <MoreVertIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
-              <IconButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsFullscreen(!isFullscreen);
-                }}
-                color="primary"
-                sx={{ mr: 1 }}
-              >
-                <FullscreenIcon />
-              </IconButton>
-            </Tooltip>
-            <IconButton 
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }} 
-              color="primary"
+        <Typography variant="h6" noWrap sx={{ flex: 1, mr: 2 }}>
+          {document.name}
+        </Typography>
+        <Box display="flex" alignItems="center">
+          <Tooltip title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+            <IconButton
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              size="small"
+              sx={{ mr: 1 }}
             >
+              <FullscreenIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Close">
+            <IconButton onClick={onClose} size="small">
               <CloseIcon />
             </IconButton>
-          </Box>
+          </Tooltip>
         </Box>
       </DialogTitle>
-      <DialogContent sx={{ 
-        padding: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        flex: 1,
-        overflow: 'hidden'
-      }}>
-        {renderPreview()}
+      
+      <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
+        <Paper square sx={{ borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" px={2}>
+            <Tabs
+              value={tabValue}
+              onChange={(e, newValue) => setTabValue(newValue)}
+              indicatorColor="primary"
+              textColor="primary"
+              variant="scrollable"
+              scrollButtons="auto"
+              aria-label="document tabs"
+            >
+              <Tab label="Preview" {...a11yProps(0)} />
+              <Tab label="Details" {...a11yProps(1)} />
+              <Tab label="Tags" {...a11yProps(2)} />
+            </Tabs>
+            <Box display="flex" alignItems="center">
+              <Tooltip title="Download">
+                <IconButton
+                  onClick={() => onDownload && onDownload(document)}
+                  size="small"
+                  sx={{ mr: 1 }}
+                >
+                  <DownloadIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Share">
+                <IconButton
+                  onClick={handleShareClick}
+                  size="small"
+                  sx={{ mr: 1 }}
+                >
+                  <ShareIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="More actions">
+                <IconButton
+                  onClick={handleMenuClick}
+                  size="small"
+                >
+                  <MoreVertIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+        </Paper>
+        
+        <Box flex={1} overflow="auto">
+          <TabPanel value={tabValue} index={0}>
+            {renderDocumentContent()}
+          </TabPanel>
+          
+          <TabPanel value={tabValue} index={1}>
+            <Box p={3}>
+              <Typography variant="subtitle1" gutterBottom>
+                {document.description || 'No description available'}
+              </Typography>
+              <Box mt={3}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                  Document Information
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Box display="grid" gridTemplateColumns="150px 1fr" gap={2}>
+                  <Typography variant="body2" color="textSecondary">File Name:</Typography>
+                  <Typography variant="body2">{document.name}</Typography>
+                  
+                  <Typography variant="body2" color="textSecondary">File Type:</Typography>
+                  <Typography variant="body2">{document.fileType}</Typography>
+                  
+                  <Typography variant="body2" color="textSecondary">File Size:</Typography>
+                  <Typography variant="body2">{formatFileSize(document.fileSize)}</Typography>
+                  
+                  <Typography variant="body2" color="textSecondary">Created:</Typography>
+                  <Typography variant="body2">
+                    {document.createdAt ? new Date(document.createdAt).toLocaleString() : 'N/A'}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="textSecondary">Last Modified:</Typography>
+                  <Typography variant="body2">
+                    {document.updatedAt ? new Date(document.updatedAt).toLocaleString() : 'N/A'}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              {document.versions && document.versions.length > 1 && (
+                <Box mt={4}>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                    <Typography variant="subtitle2" color="textSecondary">
+                      Version History
+                    </Typography>
+                    <Button
+                      size="small"
+                      startIcon={<HistoryIcon />}
+                      onClick={handleVersionHistoryOpen}
+                    >
+                      View All
+                    </Button>
+                  </Box>
+                  <Divider sx={{ mb: 2 }} />
+                  <Typography variant="body2" color="textSecondary">
+                    Current Version: {document.currentVersion || '1'}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </TabPanel>
+          
+          <TabPanel value={tabValue} index={2}>
+            <Box p={3}>
+              <TagManager 
+                documentId={document._id} 
+                documentTags={document.tags || []} 
+                onTagsUpdate={handleDocumentUpdated}
+              />
+            </Box>
+          </TabPanel>
+        </Box>
       </DialogContent>
       
-      {/* Document actions menu */}
+      <DialogActions sx={{ px: 2, py: 1, borderTop: '1px solid rgba(0, 0, 0, 0.12)' }}>
+        <Box display="flex" justifyContent="space-between" width="100%" alignItems="center">
+          <Box>
+            {document.tags && document.tags.length > 0 && (
+              <Box display="flex" gap={1} flexWrap="wrap">
+                {document.tags.map((tag, index) => (
+                  <Box 
+                    key={index}
+                    component="span"
+                    sx={{
+                      bgcolor: tag.color || 'primary.main',
+                      color: 'white',
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 1,
+                      fontSize: '0.75rem',
+                      display: 'inline-flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {tag.name || tag}
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Box>
+          <Box>
+            <Button onClick={onClose} color="primary">
+              Close
+            </Button>
+          </Box>
+        </Box>
+      </DialogActions>
+      
+      {/* Share Document Dialog */}
+      {showShareDialog && (
+        <ShareDocumentDialog
+          open={showShareDialog}
+          onClose={handleShareClose}
+          documentId={document._id}
+          onShareSuccess={handleDocumentUpdated}
+        />
+      )}
+      
+      {/* Version History Dialog */}
+      {showVersionHistory && (
+        <DocumentVersionHistory
+          open={showVersionHistory}
+          onClose={() => setShowVersionHistory(false)}
+          documentId={document._id}
+          currentVersion={document.currentVersion}
+          onVersionRestore={onDocumentUpdated}
+        />
+      )}
+      
+      {/* More Actions Menu */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-        onClick={(e) => e.stopPropagation()}
+        onClose={handleCloseMenu}
+        onClick={handleCloseMenu}
       >
         <MenuItem onClick={handleEdit}>
           <ListItemIcon>
@@ -271,7 +466,7 @@ const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete
           </ListItemIcon>
           <ListItemText>Edit Document</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleShare}>
+        <MenuItem onClick={handleShareClick}>
           <ListItemIcon>
             <ShareIcon fontSize="small" />
           </ListItemIcon>
@@ -284,24 +479,40 @@ const DocumentPreview = ({ open, onClose, document, onDownload, onEdit, onDelete
           <ListItemText>Version History</ListItemText>
         </MenuItem>
         <Divider />
-        <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
-          <ListItemIcon sx={{ color: 'error.main' }}>
-            <DeleteIcon fontSize="small" />
+        <MenuItem onClick={handleDelete}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" color="error" />
           </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
+          <ListItemText primaryTypographyProps={{ color: 'error' }}>
+            Delete Document
+          </ListItemText>
         </MenuItem>
       </Menu>
-      
-      {/* Version History Dialog */}
-      {document && (
-        <DocumentVersionHistory
-          document={document}
-          open={showVersionHistory}
-          onClose={handleVersionHistoryClose}
-        />
-      )}
     </Dialog>
   );
+};
+
+DocumentPreview.propTypes = {
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  document: PropTypes.shape({
+    _id: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired,
+    description: PropTypes.string,
+    fileType: PropTypes.string.isRequired,
+    fileSize: PropTypes.number,
+    fileUrl: PropTypes.string.isRequired,
+    tags: PropTypes.array,
+    createdAt: PropTypes.string,
+    updatedAt: PropTypes.string,
+    versions: PropTypes.array,
+    currentVersion: PropTypes.number
+  }),
+  onDownload: PropTypes.func.isRequired,
+  onEdit: PropTypes.func,
+  onDelete: PropTypes.func,
+  onShare: PropTypes.func,
+  onDocumentUpdated: PropTypes.func
 };
 
 export default DocumentPreview;
