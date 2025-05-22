@@ -10,6 +10,7 @@ import Dashboard from './components/Dashboard';
 import Layout from './components/layout/Layout';
 import PrivateRoute from './components/routing/PrivateRoute';
 import TaskRoutes from './routes/TaskRoutes';
+import DocumentRoutes from './routes/DocumentRoutes';
 
 // Create a theme instance
 const theme = createTheme({
@@ -77,6 +78,16 @@ function App() {
                     element={
                       <AppLayout>
                         <TaskRoutes />
+                      </AppLayout>
+                    } 
+                  />
+                  
+                  {/* Documents routes */}
+                  <Route 
+                    path="/documents/*" 
+                    element={
+                      <AppLayout>
+                        <DocumentRoutes />
                       </AppLayout>
                     } 
                   />
