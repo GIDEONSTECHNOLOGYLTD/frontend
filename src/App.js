@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './context/auth/AuthContext';
 import { WebSocketProvider } from './context/WebSocketContext';
+import { SearchProvider } from './context/SearchContext';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import Dashboard from './components/Dashboard';
@@ -11,6 +12,7 @@ import Layout from './components/layout/Layout';
 import PrivateRoute from './components/routing/PrivateRoute';
 import TaskRoutes from './routes/TaskRoutes';
 import DocumentRoutes from './routes/DocumentRoutes';
+import SearchPage from './pages/SearchPage';
 
 // Create a theme instance
 const theme = createTheme({
@@ -53,51 +55,63 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <AuthProvider>
-          <Router>
-            <div className="App">
-              <Routes>
-                {/* Public routes */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                
-                {/* Protected routes */}
-                <Route element={<PrivateRoute />}>
-                  {/* Dashboard route */}
-                  <Route 
-                    path="/" 
-                    element={
-                      <AppLayout>
-                        <Dashboard />
-                      </AppLayout>
-                    } 
-                  />
+          <SearchProvider>
+            <Router>
+              <div className="App">
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
                   
-                  {/* Tasks routes */}
-                  <Route 
-                    path="/tasks/*" 
-                    element={
-                      <AppLayout>
-                        <TaskRoutes />
-                      </AppLayout>
-                    } 
-                  />
-                  
-                  {/* Documents routes */}
-                  <Route 
-                    path="/documents/*" 
-                    element={
-                      <AppLayout>
-                        <DocumentRoutes />
-                      </AppLayout>
-                    } 
-                  />
-                  
-                  {/* Fallback route */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Route>
-              </Routes>
-            </div>
-          </Router>
+                  {/* Protected routes */}
+                  <Route element={<PrivateRoute />}>
+                    {/* Dashboard route */}
+                    <Route 
+                      path="/" 
+                      element={
+                        <AppLayout>
+                          <Dashboard />
+                        </AppLayout>
+                      } 
+                    />
+                    
+                    {/* Tasks routes */}
+                    <Route 
+                      path="/tasks/*" 
+                      element={
+                        <AppLayout>
+                          <TaskRoutes />
+                        </AppLayout>
+                      } 
+                    />
+                    
+                    {/* Documents routes */}
+                    <Route 
+                      path="/documents/*" 
+                      element={
+                        <AppLayout>
+                          <DocumentRoutes />
+                        </AppLayout>
+                      } 
+                    />
+                    
+                    {/* Search route */}
+                    <Route 
+                      path="/search" 
+                      element={
+                        <AppLayout>
+                          <SearchPage />
+                        </AppLayout>
+                      } 
+                    />
+                    
+                    {/* Fallback route */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Route>
+                </Routes>
+              </div>
+            </Router>
+          </SearchProvider>
         </AuthProvider>
       </ThemeProvider>
     </WebSocketProvider>
