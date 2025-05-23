@@ -1,0 +1,16 @@
+# Gideon's Tech Suite Frontend
+# Configuration for deploying to Render
+
+# Build command
+build: |
+  npm install --legacy-peer-deps
+  npm run build
+
+# Directory containing the built files
+static: build/
+
+# Environment variables
+env:
+  - NODE_ENV=production
+  - REACT_APP_API_URL=https://gideons-tech-suite.onrender.com/api/v1
+  - REACT_APP_WS_URL=wss://gideons-tech-suite.onrender.com/ws
