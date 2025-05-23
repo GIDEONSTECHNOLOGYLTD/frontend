@@ -121,4 +121,20 @@ export const getDocumentPermissions = async (documentId) => {
   }
 };
 
+/**
+ * Update permissions for a specific document
+ * @param {string} documentId - ID of the document
+ * @param {Object} permissions - New permissions object
+ * @returns {Promise<Object>} Updated document permissions
+ */
+export const updateDocumentPermissions = async (documentId, permissions) => {
+  try {
+    const response = await api.put(`/documents/${documentId}/permissions`, permissions);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating document permissions:', error);
+    throw error;
+  }
+};
+
 export default api;
