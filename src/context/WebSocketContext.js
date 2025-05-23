@@ -101,9 +101,9 @@ export const WebSocketProvider = ({ children }) => {
     setConnectionStatus('connecting');
     connectionStartTime.current = Date.now();
     
-    // Create new WebSocket connection
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    // Create new WebSocket connection using environment variable
+    const wsUrl = process.env.REACT_APP_WS_URL || 
+                 `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
     
     try {
       // Close existing socket if any
