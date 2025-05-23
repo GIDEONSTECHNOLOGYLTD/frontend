@@ -8,6 +8,7 @@ const useSafeAuth = () => {
     const auth = useAuth?.();
     // Return default values if auth is not available yet
     if (!auth) {
+      console.log('Auth context not available yet');
       return { 
         user: null, 
         loading: true, 
@@ -15,11 +16,16 @@ const useSafeAuth = () => {
         token: null
       };
     }
+    
+    // Ensure user object exists and has required properties
+    const safeUser = auth.user || null;
+    const token = localStorage.getItem(AUTH_TOKEN);
+    
     return {
-      user: auth.user || null,
+      user: safeUser,
       loading: auth.loading ?? false,
-      isAuthenticated: !!auth.user,
-      token: localStorage.getItem(AUTH_TOKEN)
+      isAuthenticated: !!(safeUser && token),
+      token: token
     };
   } catch (error) {
     console.warn('AuthContext not available, using fallback', error);
@@ -36,6 +42,16 @@ const WebSocketContext = createContext(null);
 
 export const WebSocketProvider = ({ children }) => {
   const { user, loading, isAuthenticated } = useSafeAuth();
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('WebSocketProvider - Auth state:', { 
+      hasUser: !!user, 
+      loading, 
+      isAuthenticated,
+      token: localStorage.getItem(AUTH_TOKEN) ? 'Token exists' : 'No token'
+    });
+  }, [user, loading, isAuthenticated]);
   const [socket, setSocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   
