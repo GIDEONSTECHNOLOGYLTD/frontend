@@ -21,7 +21,7 @@ import {
   MenuItem
 } from '@mui/material';
 import { Close as CloseIcon, PersonAdd as PersonAddIcon } from '@mui/icons-material';
-import { API_URL } from '../config';
+import { API_URL } from '../../config.js';
 
 const PERMISSIONS = [
   { value: 'view', label: 'Can view' },

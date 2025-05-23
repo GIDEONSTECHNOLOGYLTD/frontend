@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import axios from 'axios';
-import { API_URL } from '../config';
+import { API_URL } from '../../config.js';
 import { setAlert } from '../../actions/alert';
 import { 
   Box, 

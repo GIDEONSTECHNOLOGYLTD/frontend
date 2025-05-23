@@ -30,7 +30,7 @@ import {
   Add as AddIcon
 } from '@mui/icons-material';
 import axios from 'axios';
-import { API_URL } from '../config';
+import { API_URL } from '../config.js';
 
 // Dashboard statistics card component
 const StatCard = ({ icon: Icon, title, value, color = 'primary', to }) => {
