@@ -7,31 +7,33 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+  withCredentials: true, // Important: This is required for cookies to be sent with requests
   timeout: 15000, // 15 seconds timeout
 });
+
+console.log('API Base URL:', api.defaults.baseURL); // Debug log
 
 // Add request interceptor to add auth token to requests
 api.interceptors.request.use(
   (config) => {
-    // Skip authentication for auth endpoints
-    if (config.url.includes('/auth/')) {
+    // Skip authentication for auth endpoints and health check
+    if (config.url.includes('/auth/') || config.url.includes('/health')) {
       return config;
     }
     
+    // Don't override the Authorization header if it's already set
+    if (config.headers.Authorization) {
+      return config;
+    }
+    
+    // Try to get token from localStorage
     const token = localStorage.getItem('gts_token');
     if (token) {
-      // Only add the token if it's not already set in the headers
-      if (!config.headers.Authorization) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+      config.headers.Authorization = `Bearer ${token}`;
     } else {
-      // If no token and we're not on the login page, redirect to login
-      if (window.location.pathname !== '/login') {
-        console.warn('No auth token found, redirecting to login');
-        window.location.href = '/login';
-      }
-      return Promise.reject(new Error('No authentication token found'));
+      console.warn('No auth token found in localStorage');
     }
+    
     return config;
   },
   (error) => {
@@ -40,30 +42,93 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle authentication errors
+// Add response interceptor to handle authentication errors and common API responses
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Log successful API calls in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API Response:', {
+        url: response.config.url,
+        status: response.status,
+        data: response.data,
+      });
+    }
+    return response;
+  },
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error?.config;
     
-    // If the error is 401 and we haven't already retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      console.warn('Received 401, removing token and redirecting to login');
-      localStorage.removeItem('gts_token');
-      
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+    // Handle network errors
+    if (!error.response) {
+      console.error('Network Error:', error.message);
+      return Promise.reject({
+        message: 'Unable to connect to the server. Please check your internet connection.',
+        isNetworkError: true,
+        originalError: error
+      });
     }
     
     // Log the error for debugging
-    console.error('API Error:', {
-      url: originalRequest.url,
+    const errorData = {
+      url: originalRequest?.url,
       status: error.response?.status,
+      statusText: error.response?.statusText,
       data: error.response?.data,
-      message: error.message
-    });
+      config: originalRequest ? {
+        method: originalRequest.method,
+        headers: originalRequest.headers,
+        data: originalRequest.data,
+      } : {},
+    };
+    
+    console.error('API Error:', errorData);
+    
+    // Handle 401 Unauthorized errors
+    if (error.response?.status === 401) {
+      console.warn('Authentication required, redirecting to login');
+      
+      // Only redirect if we're not already on the login page
+      if (window.location.pathname !== '/login') {
+        // Clear the token from localStorage
+        localStorage.removeItem('gts_token');
+        // Redirect to login page with a return URL
+        const returnUrl = window.location.pathname + window.location.search;
+        window.location.href = `/login?returnUrl=${encodeURIComponent(returnUrl)}`;
+      }
+      
+      return Promise.reject({
+        ...error,
+        message: 'Your session has expired. Please log in again.',
+        requiresAuth: true
+      });
+    }
+    
+    // Handle other error statuses
+    if (error.response?.status >= 500) {
+      return Promise.reject({
+        ...error,
+        message: 'A server error occurred. Please try again later.',
+        isServerError: true
+      });
+    }
+    
+    // Handle 404 Not Found
+    if (error.response?.status === 404) {
+      return Promise.reject({
+        ...error,
+        message: 'The requested resource was not found.',
+        isNotFound: true
+      });
+    }
+    
+    // For other errors, include the server's error message if available
+    const serverMessage = error.response?.data?.message || error.response?.statusText;
+    if (serverMessage) {
+      return Promise.reject({
+        ...error,
+        message: serverMessage
+      });
+    }
     
     return Promise.reject(error);
   }

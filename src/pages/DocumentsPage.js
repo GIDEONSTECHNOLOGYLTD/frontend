@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/auth/AuthContext';
-import axios from 'axios';
-import { API_URL } from '../config.js';
+import api from '../services/api';
 
 // Material-UI components
 import {
@@ -134,27 +133,17 @@ const DocumentsPage = () => {
       setLoading(true);
       setError('');
       
-      const token = localStorage.getItem('gts_token');
-      
       // Fetch documents
-      const docsResponse = await axios.get(`${API_URL}/documents`, {
-        params: { folder: folderId, project: projectId },
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setDocuments(docsResponse.data.data || []);
+      const response = await api.get('/documents', { params: { projectId, folder: folderId } });
+      setDocuments(response.data.data || []);
       
       // Fetch folders
-      const foldersResponse = await axios.get(`${API_URL}/folders`, {
-        params: { parent: folderId, project: projectId },
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const foldersResponse = await api.get('/folders', { params: { projectId, parent: folderId } });
       setFolders(foldersResponse.data.data || []);
       
       // Update current folder if folderId is provided
       if (folderId) {
-        const folderResponse = await axios.get(`${API_URL}/folders/${folderId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const folderResponse = await api.get(`/folders/${folderId}`);
         setCurrentFolder(folderResponse.data.data);
         
         // Build breadcrumbs
@@ -169,9 +158,7 @@ const DocumentsPage = () => {
           });
           
           if (current.parent) {
-            const parentResponse = await axios.get(`${API_URL}/folders/${current.parent._id}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const parentResponse = await api.get(`/folders/${current.parent._id}`);
             current = parentResponse.data.data;
           } else {
             current = null;
@@ -184,16 +171,10 @@ const DocumentsPage = () => {
         ]);
       } else {
         // Root level - fetch folders
-        const foldersResponse = await axios.get(
-          projectId 
-            ? `${API_URL}/folders?project=${projectId}`
-            : `${API_URL}/folders`,
-          {
-            headers: { 'Authorization': `Bearer ${token}` }
-          }
-        );
-        
-        setFolders(foldersResponse.data.data || []);
+        const response = await api.get('/folders', {
+          params: { project: projectId }
+        });
+        setFolders(response.data.data || []);
         setBreadcrumbs([{ id: 'root', name: 'Home', type: 'root' }]);
       }
       
