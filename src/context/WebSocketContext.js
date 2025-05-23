@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useAuth } from './auth/AuthContext';
-import { AUTH_TOKEN } from './config';
+import { AUTH_TOKEN } from '../config';
 
 // Safe auth hook with proper error handling
 const useSafeAuth = () => {
