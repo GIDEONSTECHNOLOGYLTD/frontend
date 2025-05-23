@@ -55,8 +55,7 @@ const AdminPanel = () => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        },
-        withCredentials: true
+        }
       });
       
       console.log('Users fetched successfully:', response.data.data);
@@ -118,8 +117,7 @@ const AdminPanel = () => {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
-          },
-          withCredentials: true
+          }
         }
       );
       
