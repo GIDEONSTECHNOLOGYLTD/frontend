@@ -152,4 +152,20 @@ export const getDocumentVersions = async (documentId) => {
   }
 };
 
+/**
+ * Restore a specific version of a document
+ * @param {string} documentId - ID of the document
+ * @param {string} versionId - ID of the version to restore
+ * @returns {Promise<Object>} Restored document data
+ */
+export const restoreDocumentVersion = async (documentId, versionId) => {
+  try {
+    const response = await api.post(`/documents/${documentId}/versions/${versionId}/restore`);
+    return response.data;
+  } catch (error) {
+    console.error('Error restoring document version:', error);
+    throw error;
+  }
+};
+
 export default api;
