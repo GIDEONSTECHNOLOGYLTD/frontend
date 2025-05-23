@@ -137,4 +137,19 @@ export const updateDocumentPermissions = async (documentId, permissions) => {
   }
 };
 
+/**
+ * Get version history for a specific document
+ * @param {string} documentId - ID of the document
+ * @returns {Promise<Array>} Array of document versions
+ */
+export const getDocumentVersions = async (documentId) => {
+  try {
+    const response = await api.get(`/documents/${documentId}/versions`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching document versions:', error);
+    throw error;
+  }
+};
+
 export default api;
