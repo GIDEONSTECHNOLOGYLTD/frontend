@@ -26,36 +26,31 @@ FROM nginx:alpine
 # Install bash for debugging
 RUN apk add --no-cache bash
 
+# Create necessary directories with correct permissions
+RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx /var/lib/nginx/tmp && \
+    chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx /var/lib/nginx/tmp && \
+    chmod -R 755 /var/cache/nginx /var/run /var/log/nginx /var/lib/nginx/tmp
+
+# Create temp directories for nginx
+RUN mkdir -p /tmp/nginx && \
+    chown -R nginx:nginx /tmp/nginx && \
+    chmod -R 755 /tmp/nginx
+
 # Copy nginx config
-COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy entrypoint script
-COPY nginx/docker-entrypoint.sh /docker-entrypoint.sh
-
-# Make entrypoint script executable
-RUN chmod +x /docker-entrypoint.sh
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
 
 # Copy built files from build stage
 COPY --from=build /app/build /usr/share/nginx/html
 
 # Set permissions
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    chown -R nginx:nginx /etc/nginx/conf.d && \
-    chmod 755 /var/cache/nginx /var/log/nginx /var/run /run
-
-# Create necessary directories
-RUN mkdir -p /run/nginx && \
-    chown -R nginx:nginx /run/nginx && \
-    chmod -R 755 /run/nginx
+    chmod -R 755 /usr/share/nginx/html
 
 # Run as non-root user
 USER nginx
 
-# Expose port 80
-EXPOSE 80
+# Expose port 8080
+EXPOSE 8080
 
-# Start nginx using the entrypoint script
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Start nginx in the foreground
+CMD ["nginx", "-g", "daemon off;"]
