@@ -2,9 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with base URL
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' 
-    ? 'https://gideons-tech-suite.onrender.com/api/v1' 
-    : 'http://localhost:5000/api/v1',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -16,7 +14,12 @@ const api = axios.create({
 // Add request interceptor to add auth token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    // Skip authentication for auth endpoints
+    if (config.url.includes('/auth/')) {
+      return config;
+    }
+    
+    const token = localStorage.getItem('gts_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     } else {
@@ -33,48 +36,13 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle 401 errors and token refresh
+// Add response interceptor to handle 401 errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-    
-    // If the error is 401 and we haven't tried to refresh the token yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      try {
-        // Try to refresh the token
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
-          const response = await axios.post(
-            `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1'}/auth/refresh-token`,
-            { refreshToken }
-          );
-          
-          const { token, refreshToken: newRefreshToken } = response.data;
-          localStorage.setItem('token', token);
-          localStorage.setItem('refreshToken', newRefreshToken);
-          
-          // Update the Authorization header
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          
-          // Retry the original request
-          return api(originalRequest);
-        }
-      } catch (refreshError) {
-        console.error('Failed to refresh token:', refreshError);
-        // If refresh fails, redirect to login
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
-      }
-    }
-    
-    // If the error is 401 and we already tried to refresh, redirect to login
+    // If the error is 401, clear token and redirect to login
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('gts_token');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }

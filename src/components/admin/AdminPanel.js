@@ -44,7 +44,7 @@ const AdminPanel = () => {
       setError('');
       
       // Get token from localStorage
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('gts_token');
       if (!token) {
         throw new Error('No authentication token found');
       }
@@ -93,7 +93,7 @@ const AdminPanel = () => {
       setLoading(true);
       
       // Get the token from localStorage
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('gts_token');
       if (!token) {
         throw new Error('No authentication token found');
       }
