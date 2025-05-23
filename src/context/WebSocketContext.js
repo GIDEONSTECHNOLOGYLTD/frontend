@@ -1,26 +1,40 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from './auth/AuthContext';
+
+// Create a safe useAuth hook that won't throw if AuthContext is not available
+const useSafeAuth = () => {
+  try {
+    return useAuth() || {};
+  } catch (error) {
+    console.warn('AuthContext not available, using empty auth object');
+    return {};
+  }
+};
 
 const WebSocketContext = createContext(null);
 
 export const WebSocketProvider = ({ children }) => {
-  const { user } = useAuth() || {}; // Add fallback for undefined auth
+  // Use the safe auth hook
+  const { user } = useSafeAuth();
   const [socket, setSocket] = useState(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const isMounted = useRef(true);
-
-  const connectWebSocket = () => {
-    if (!isMounted.current) return;
+  const socketRef = useRef(null);
+  
+  // Memoize the connect function to prevent unnecessary recreations
+  const connectWebSocket = useCallback(() => {
+    if (!isMounted.current) return null;
     
     try {
       // Close existing socket if any
-      if (socket) {
-        socket.close();
+      if (socketRef.current) {
+        socketRef.current.close();
       }
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+      socketRef.current = ws;
 
       ws.onopen = () => {
         if (!isMounted.current) {
@@ -46,6 +60,7 @@ export const WebSocketProvider = ({ children }) => {
       };
 
       ws.onclose = () => {
+        if (!isMounted.current) return;
         console.log('WebSocket Disconnected');
         // Attempt to reconnect with exponential backoff
         const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
@@ -62,45 +77,55 @@ export const WebSocketProvider = ({ children }) => {
 
       ws.onerror = (error) => {
         console.error('WebSocket Error:', error);
-        ws.close();
       };
 
       setSocket(ws);
+      return ws;
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
+      return null;
     }
-  };
+  }, []); // No dependencies, we use refs for everything that changes
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       isMounted.current = false;
-      if (socket) {
-        socket.close();
+      if (socketRef.current) {
+        socketRef.current.close();
       }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [socket]);
+  }, []);
 
   // Connect on mount and when user changes
   useEffect(() => {
-    if (user) {
-      connectWebSocket();
-    }
-    // Cleanup is handled by the other effect
-  }, [user]);
+    // Always try to connect, but only authenticate if user is available
+    const ws = connectWebSocket();
+    
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [connectWebSocket]);
 
+  // Only render children once we have a socket or have attempted to connect
   return (
     <WebSocketContext.Provider value={socket}>
-      {children}
+      {socket !== undefined ? children : null}
     </WebSocketContext.Provider>
   );
 };
 
 export const useWebSocket = () => {
-  return useContext(WebSocketContext);
+  const socket = useContext(WebSocketContext);
+  if (socket === undefined) {
+    throw new Error('useWebSocket must be used within a WebSocketProvider');
+  }
+  return socket;
 };
 
 export default WebSocketContext;
