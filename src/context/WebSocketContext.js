@@ -1,30 +1,29 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from './auth/AuthContext';
 
-// Create a safe useAuth hook that won't throw if AuthContext is not available
+// Create a more robust safe auth hook
 const useSafeAuth = () => {
   try {
-    return useAuth() || {};
+    const auth = useAuth();
+    return auth || { user: null, loading: true };
   } catch (error) {
-    console.warn('AuthContext not available, using empty auth object');
-    return {};
+    console.warn('AuthContext not available, using fallback');
+    return { user: null, loading: false };
   }
 };
 
 const WebSocketContext = createContext(null);
 
 export const WebSocketProvider = ({ children }) => {
-  // Use the safe auth hook
-  const { user } = useSafeAuth();
+  const { user, loading } = useSafeAuth();
   const [socket, setSocket] = useState(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const isMounted = useRef(true);
   const socketRef = useRef(null);
-  
-  // Memoize the connect function to prevent unnecessary recreations
+
   const connectWebSocket = useCallback(() => {
-    if (!isMounted.current) return null;
+    if (!isMounted.current || loading) return null;
     
     try {
       // Close existing socket if any
@@ -45,16 +44,18 @@ export const WebSocketProvider = ({ children }) => {
         console.log('WebSocket Connected');
         reconnectAttempts.current = 0;
         
-        // Only try to authenticate if we have a token
-        const token = localStorage.getItem('gts_token');
-        if (token) {
-          try {
-            ws.send(JSON.stringify({
-              type: 'AUTH',
-              token
-            }));
-          } catch (err) {
-            console.error('Failed to send auth message:', err);
+        // Only try to authenticate if we have a user
+        if (user) {
+          const token = localStorage.getItem('gts_token');
+          if (token) {
+            try {
+              ws.send(JSON.stringify({
+                type: 'AUTH',
+                token
+              }));
+            } catch (err) {
+              console.error('Failed to send auth message:', err);
+            }
           }
         }
       };
@@ -62,11 +63,12 @@ export const WebSocketProvider = ({ children }) => {
       ws.onclose = () => {
         if (!isMounted.current) return;
         console.log('WebSocket Disconnected');
-        // Attempt to reconnect with exponential backoff
-        const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
-        reconnectAttempts.current++;
         
-        if (reconnectAttempts.current <= 5) { // Max 5 retries
+        // Only attempt to reconnect if we're still mounted
+        if (isMounted.current && reconnectAttempts.current < 5) {
+          const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+          reconnectAttempts.current++;
+          
           reconnectTimeoutRef.current = setTimeout(() => {
             if (isMounted.current) {
               connectWebSocket();
@@ -85,7 +87,22 @@ export const WebSocketProvider = ({ children }) => {
       console.error('Failed to create WebSocket:', error);
       return null;
     }
-  }, []); // No dependencies, we use refs for everything that changes
+  }, [user, loading]);
+
+  // Connect on mount and when user/auth state changes
+  useEffect(() => {
+    if (!loading) {
+      const ws = connectWebSocket();
+      return () => {
+        if (ws) {
+          ws.close();
+        }
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+        }
+      };
+    }
+  }, [connectWebSocket, loading]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -100,22 +117,9 @@ export const WebSocketProvider = ({ children }) => {
     };
   }, []);
 
-  // Connect on mount and when user changes
-  useEffect(() => {
-    // Always try to connect, but only authenticate if user is available
-    const ws = connectWebSocket();
-    
-    return () => {
-      if (ws) {
-        ws.close();
-      }
-    };
-  }, [connectWebSocket]);
-
-  // Only render children once we have a socket or have attempted to connect
   return (
     <WebSocketContext.Provider value={socket}>
-      {socket !== undefined ? children : null}
+      {children}
     </WebSocketContext.Provider>
   );
 };
