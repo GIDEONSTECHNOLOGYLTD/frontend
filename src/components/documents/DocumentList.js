@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
-import { API_URL } from '../../config';
+import { API_URL } from '../config';
 import {
   Box,
   Grid,

@@ -42,7 +42,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useAuth } from '../../context/auth/AuthContext';
 import axios from 'axios';
-import { API_URL } from '../../config';
+import { API_URL } from '../config';
 import Markdown from 'react-markdown';
 
 const TabPanel = (props) => {

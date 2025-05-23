@@ -22,7 +22,7 @@ import {
   Download as DownloadIcon,
   MoreVert as MoreVertIcon
 } from '@mui/icons-material';
-import { API_URL } from '../../config';
+import { API_URL } from '../config';
 import { format } from 'date-fns';
 
 const DocumentVersionHistory = ({ document, open, onClose }) => {
