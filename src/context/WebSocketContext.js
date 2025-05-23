@@ -58,11 +58,6 @@ export const WebSocketProvider = ({ children }) => {
   const lastPongTime = useRef(null);
   const connectionStartTime = useRef(null);
   
-  // Get the current auth token
-  const token = useMemo(() => {
-    return localStorage.getItem(AUTH_TOKEN);
-  }, [isAuthenticated]);
-  
   // Cleanup function for WebSocket connections
   const cleanupWebSocket = useCallback((code = 1000, reason = 'Normal closure') => {
     if (socketRef.current) {
@@ -268,7 +263,7 @@ export const WebSocketProvider = ({ children }) => {
   }, [isAuthenticated, loading, cleanupWebSocket]);
   
   // Memoize the cleanup function to prevent unnecessary re-renders
-  const stableCleanupWebSocket = useCallback(cleanupWebSocket, []);
+  const stableCleanupWebSocket = useCallback(cleanupWebSocket, [cleanupWebSocket]);
   
   // Create a ref to track if we've already connected
   const hasConnectedRef = useRef(false);
@@ -338,7 +333,7 @@ export const WebSocketProvider = ({ children }) => {
         stableCleanupWebSocket(1000, 'Component unmounted or auth state changed');
       }
     };
-  }, [isAuthenticated, loading, connectWebSocket, stableCleanupWebSocket]);
+  }, [isAuthenticated, loading, connectWebSocket, stableCleanupWebSocket, handleConnection]);
 
   // Provide the WebSocket context
   const value = useMemo(() => ({

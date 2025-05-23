@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
@@ -32,11 +32,10 @@ import {
   Comment as CommentIcon,
   CheckCircle as CheckCircleIcon,
   AccessTime as TimeIcon,
-  Person as PersonIcon,
   Label as LabelIcon,
   AttachFile as AttachFileIcon,
   Add as AddIcon,
-  Close as CloseIcon
+  // Close as CloseIcon - Removed unused import
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -68,7 +67,7 @@ const TabPanel = (props) => {
 const TaskDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuth(); // eslint-disable-line no-unused-vars
   
   const [loading, setLoading] = useState(true);
   const [task, setTask] = useState(null);
@@ -81,12 +80,7 @@ const TaskDetail = () => {
   
   const open = Boolean(anchorEl);
 
-  useEffect(() => {
-    fetchTask();
-    fetchComments();
-  }, [id]);
-
-  const fetchTask = async () => {
+  const fetchTask = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('gts_token');
@@ -96,12 +90,13 @@ const TaskDetail = () => {
       setTask(response.data.data);
     } catch (error) {
       console.error('Error fetching task:', error);
+      // Handle error
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
       const token = localStorage.getItem('gts_token');
       const response = await axios.get(`${API_URL}/tasks/${id}/comments`, {
@@ -111,7 +106,12 @@ const TaskDetail = () => {
     } catch (error) {
       console.error('Error fetching comments:', error);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchTask();
+    fetchComments();
+  }, [fetchTask, fetchComments]);
 
   const handleMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
