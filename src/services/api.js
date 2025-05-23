@@ -5,7 +5,10 @@ const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1',
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
+  withCredentials: true, // Important for cookies, authorization headers with HTTPS
+  timeout: 10000, // 10 seconds timeout
 });
 
 // Add request interceptor to add auth token to requests
