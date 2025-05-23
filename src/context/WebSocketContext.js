@@ -5,30 +5,21 @@ import { AUTH_TOKEN } from '../../config';
 // Safe auth hook with proper error handling
 const useSafeAuth = () => {
   try {
-    const auth = useAuth?.();
-    // Return default values if auth is not available yet
-    if (!auth) {
-      console.log('Auth context not available yet');
-      return { 
-        user: null, 
-        loading: true, 
-        isAuthenticated: false,
-        token: null
-      };
-    }
+    // Use optional chaining and provide a default empty object
+    const auth = useAuth?.() || {};
     
     // Ensure user object exists and has required properties
-    const safeUser = auth.user || null;
+    const safeUser = auth?.user || null;
     const token = localStorage.getItem(AUTH_TOKEN);
     
     return {
       user: safeUser,
-      loading: auth.loading ?? false,
+      loading: !!auth?.loading,
       isAuthenticated: !!(safeUser && token),
       token: token
     };
   } catch (error) {
-    console.warn('AuthContext not available, using fallback', error);
+    console.warn('Error in useSafeAuth:', error);
     return { 
       user: null, 
       loading: false, 
@@ -41,7 +32,9 @@ const useSafeAuth = () => {
 const WebSocketContext = createContext(null);
 
 export const WebSocketProvider = ({ children }) => {
-  const { user, loading, isAuthenticated } = useSafeAuth();
+  // Get auth state with safe defaults
+  const authState = useSafeAuth();
+  const { user, loading, isAuthenticated } = authState || {};
   
   // Debug logging
   useEffect(() => {
@@ -49,9 +42,10 @@ export const WebSocketProvider = ({ children }) => {
       hasUser: !!user, 
       loading, 
       isAuthenticated,
-      token: localStorage.getItem(AUTH_TOKEN) ? 'Token exists' : 'No token'
+      hasToken: !!localStorage.getItem(AUTH_TOKEN)
     });
   }, [user, loading, isAuthenticated]);
+  
   const [socket, setSocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   
@@ -97,11 +91,18 @@ export const WebSocketProvider = ({ children }) => {
   
   // Connect to WebSocket
   const connectWebSocket = useCallback(() => {
-    // Don't attempt to connect if we're still loading, unmounted, or not authenticated
+    // Don't attempt to connect if we don't have a token
+    const token = localStorage.getItem(AUTH_TOKEN);
+    if (!token) {
+      console.log('No auth token available, skipping WebSocket connection');
+      return;
+    }
+    
+    // Don't attempt to connect if we're still loading or unmounted
     if (loading || !isMounted.current) {
       console.log('WebSocket: Skipping connection -', 
         loading ? 'still loading' : 'unmounted');
-      return () => cleanupWebSocket(1000, 'Connection attempt aborted');
+      return;
     }
     
     // If not authenticated, clean up any existing connection
@@ -260,24 +261,32 @@ export const WebSocketProvider = ({ children }) => {
   
   // Effect to handle authentication state changes
   useEffect(() => {
-    // Initialize mounted state
+    // Set mounted state
     isMounted.current = true;
     
     // Only proceed if we're not in a loading state
     if (loading) {
       console.log('WebSocket: Waiting for auth to load...');
-      return () => {}; // Return empty cleanup function
+      return () => {
+        isMounted.current = false;
+        cleanupWebSocket(1000, 'Component unmounted');
+      };
     }
     
-    // If authenticated and not already connected, connect
-    if (isAuthenticated) {
-      console.log('WebSocket: User authenticated, attempting to connect...');
-      connectWebSocket();
-    } else {
-      // Close WebSocket if user logs out or is not authenticated
-      console.log('WebSocket: User not authenticated, cleaning up...');
-      cleanupWebSocket(1000, 'User not authenticated');
-    }
+    // Function to handle connection logic
+    const handleConnection = () => {
+      // If authenticated and not already connected, connect
+      if (isAuthenticated) {
+        console.log('WebSocket: User authenticated, attempting to connect...');
+        connectWebSocket();
+      } else {
+        // Close WebSocket if user logs out or is not authenticated
+        console.log('WebSocket: User not authenticated, cleaning up...');
+        cleanupWebSocket(1000, 'User not authenticated');
+      }
+    };
+    
+    handleConnection();
     
     // Cleanup function
     return () => {
@@ -295,11 +304,10 @@ export const WebSocketProvider = ({ children }) => {
       }
       
       // Clean up WebSocket when auth state changes
-      if (socketRef.current) {
-        cleanupWebSocket(1000, 'Auth state changed');
-      }
+      cleanupWebSocket(1000, 'Component unmounted or auth state changed');
     };
-  }, [isAuthenticated, loading, connectWebSocket, cleanupWebSocket]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, loading]); // Removed connectWebSocket and cleanupWebSocket from deps to prevent infinite loops
 
   // Provide the WebSocket context
   const value = useMemo(() => ({
