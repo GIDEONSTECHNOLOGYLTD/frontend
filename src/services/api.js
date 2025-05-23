@@ -86,4 +86,24 @@ export const getSearchSuggestions = async (query) => {
   }
 };
 
+/**
+ * Share a document with other users
+ * @param {string} documentId - ID of the document to share
+ * @param {string} userId - ID of the user to share with
+ * @param {string} permission - Permission level ('view', 'edit', 'manage')
+ * @returns {Promise<Object>} Response from the API
+ */
+export const shareDocument = async (documentId, userId, permission = 'view') => {
+  try {
+    const response = await api.post(`/documents/${documentId}/share`, {
+      userId,
+      permission
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sharing document:', error);
+    throw error;
+  }
+};
+
 export default api;
