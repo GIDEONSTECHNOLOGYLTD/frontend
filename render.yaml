@@ -1,17 +1,18 @@
 services:
   - type: web
     name: gideons-tech-suite-frontend
-    env: docker
+    runtime: node
     plan: free
     region: oregon
-    buildCommand: ./build.sh
-    startCommand: nginx -g 'daemon off;'
+    buildCommand: |
+      npm install --legacy-peer-deps
+      npm run build
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: REACT_APP_API_URL
         value: https://gideons-tech-suite.onrender.com/api/v1
       - key: REACT_APP_WS_URL
         value: wss://gideons-tech-suite.onrender.com/ws
-      - key: NODE_ENV
-        value: production
     healthCheckPath: /
     autoDeploy: true
