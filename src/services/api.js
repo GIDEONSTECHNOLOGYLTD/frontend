@@ -106,4 +106,19 @@ export const shareDocument = async (documentId, userId, permission = 'view') => 
   }
 };
 
+/**
+ * Get permissions for a specific document
+ * @param {string} documentId - ID of the document
+ * @returns {Promise<Object>} Document permissions
+ */
+export const getDocumentPermissions = async (documentId) => {
+  try {
+    const response = await api.get(`/documents/${documentId}/permissions`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching document permissions:', error);
+    throw error;
+  }
+};
+
 export default api;
