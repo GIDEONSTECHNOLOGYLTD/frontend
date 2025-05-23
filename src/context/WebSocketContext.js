@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useAuth } from './auth/AuthContext';
 import { AUTH_TOKEN } from '../../config';
 
@@ -35,59 +35,201 @@ const useSafeAuth = () => {
 const WebSocketContext = createContext(null);
 
 export const WebSocketProvider = ({ children }) => {
-  const { user, loading, isAuthenticated, token } = useSafeAuth();
+  const { user, loading, isAuthenticated } = useSafeAuth();
   const [socket, setSocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
-  const reconnectAttempts = useRef(0);
-  const reconnectTimeoutRef = useRef(null);
-  const isMounted = useRef(true);
+  
+  // Refs for values that don't trigger re-renders
   const socketRef = useRef(null);
+  const reconnectAttempts = useRef(0);
+  const isMounted = useRef(true);
+  const reconnectTimeoutRef = useRef(null);
   const pingInterval = useRef(null);
   const lastPongTime = useRef(null);
   const connectionStartTime = useRef(null);
   
-  // Memoize the connectWebSocket function
-  const connectWebSocket = useCallback(() => {
-    // Don't attempt to connect if we're still loading or unmounted
-    if (loading || !isMounted.current) {
-      console.log('WebSocket: Skipping connection -', loading ? 'still loading' : 'unmounted');
-      return null;
+  // Get the current auth token
+  const token = useMemo(() => {
+    return localStorage.getItem(AUTH_TOKEN);
+  }, [isAuthenticated]); // Only update when auth state changes
+  
+  // Cleanup function for WebSocket connections
+  const cleanupWebSocket = useCallback((code = 1000, reason = 'Normal closure') => {
+    if (socketRef.current) {
+      console.log(`WebSocket: Cleaning up connection (${code} - ${reason})`);
+      try {
+        socketRef.current.close(code, reason);
+      } catch (error) {
+        console.error('Error closing WebSocket:', error);
+      }
+      socketRef.current = null;
+      setSocket(null);
     }
     
-    // Don't connect if user is not authenticated
-    if (!isAuthenticated) {
-      console.log('WebSocket: Not authenticated, skipping connection');
-      return null;
+    if (pingInterval.current) {
+      clearInterval(pingInterval.current);
+      pingInterval.current = null;
     }
     
-    // Clear any existing reconnect timeout
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
-
+  }, []);
+  
+  // Connect to WebSocket
+  const connectWebSocket = useCallback(() => {
+    // Don't attempt to connect if we're still loading, unmounted, or not authenticated
+    if (loading || !isMounted.current || !isAuthenticated) {
+      console.log('WebSocket: Skipping connection -', 
+        loading ? 'still loading' : !isMounted.current ? 'unmounted' : 'not authenticated');
+      return () => cleanupWebSocket(1000, 'Connection attempt aborted');
+    }
+    
+    // Clean up any existing connection first
+    cleanupWebSocket(1000, 'Reconnecting');
+    
+    // Get the current token
+    const currentToken = localStorage.getItem(AUTH_TOKEN);
+    if (!currentToken) {
+      console.log('WebSocket: No auth token available');
+      setConnectionStatus('disconnected');
+      return () => cleanupWebSocket(1000, 'No auth token');
+    }
+    
+    // Set up connection state
+    setConnectionStatus('connecting');
+    connectionStartTime.current = Date.now();
+    
+    // Create new WebSocket connection
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
     try {
       // Close existing socket if any
       if (socketRef.current) {
-        socketRef.current.close();
+        socketRef.current.close(1000, 'Replacing connection');
       }
-
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const authToken = token || localStorage.getItem(AUTH_TOKEN);
       
-      // Only connect if we have a token and user is authenticated
-      if (!authToken || !isAuthenticated) {
-        console.log('No auth token or user not authenticated, skipping WebSocket connection');
-        setConnectionStatus('disconnected');
-        return null;
-      }
-
-      const ws = new WebSocket(
-        `${protocol}//${window.location.host}/ws`,
-        [authToken] // Pass token as subprotocol
-      );
-      
+      const ws = new WebSocket(wsUrl, [currentToken]);
       socketRef.current = ws;
+      setSocket(ws);
+      
+      // Connection opened handler
+      ws.onopen = () => {
+        if (!isMounted.current) {
+          ws.close(1000, 'Component unmounted');
+          return;
+        }
+        
+        console.log('WebSocket Connected');
+        reconnectAttempts.current = 0;
+        setConnectionStatus('connected');
+        
+        // Send initial auth message
+        try {
+          ws.send(JSON.stringify({
+            type: 'AUTH',
+            token: currentToken
+          }));
+          
+          // Start ping interval
+          if (pingInterval.current) {
+            clearInterval(pingInterval.current);
+          }
+          
+          pingInterval.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(JSON.stringify({ type: 'PING' }));
+                
+                // Check if we haven't received a pong in a while
+                if (lastPongTime.current && (Date.now() - lastPongTime.current > 45000)) {
+                  console.warn('No PONG received in the last 45 seconds, reconnecting...');
+                  ws.close(4000, 'No PONG received');
+                }
+              } catch (err) {
+                console.error('Error sending PING:', err);
+              }
+            }
+          }, 30000); // Send PING every 30 seconds
+        } catch (err) {
+          console.error('Error during WebSocket setup:', err);
+        }
+      };
+      
+      // Message handler
+      ws.onmessage = (event) => {
+        if (!isMounted.current) return;
+        
+        try {
+          const message = JSON.parse(event.data);
+          
+          // Handle PONG messages
+          if (message.type === 'PONG') {
+            lastPongTime.current = Date.now();
+            return;
+          }
+          
+          // Handle other message types here
+          console.log('WebSocket message received:', message);
+          
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+        }
+      };
+      
+      // Error handler
+      ws.onerror = (error) => {
+        console.error('WebSocket Error:', error);
+        if (isMounted.current) {
+          setConnectionStatus('error');
+        }
+      };
+      
+      // Close handler
+      ws.onclose = (event) => {
+        if (!isMounted.current) return;
+        
+        console.log('WebSocket Disconnected', event.code, event.reason);
+        setConnectionStatus('disconnected');
+        
+        // Clear ping interval
+        if (pingInterval.current) {
+          clearInterval(pingInterval.current);
+          pingInterval.current = null;
+        }
+        
+        // Don't try to reconnect if we're no longer mounted or if this was a normal closure
+        if (!isMounted.current || event.code === 1000) {
+          return;
+        }
+        
+        // Exponential backoff for reconnection
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+        reconnectAttempts.current++;
+        
+        console.log(`Attempting to reconnect in ${delay}ms...`);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (isMounted.current) {
+            setConnectionStatus('reconnecting');
+            connectWebSocket();
+          }
+        }, delay);
+      };
+      
+      // Return cleanup function
+      return () => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close(1000, 'Connection replaced');
+        }
+      };
+      
+    } catch (error) {
+      console.error('Error creating WebSocket:', error);
+      setConnectionStatus('error');
+      return () => cleanupWebSocket(1000, 'Connection error');
+    }
 
       ws.onopen = () => {
         if (!isMounted.current) {
@@ -223,17 +365,26 @@ export const WebSocketProvider = ({ children }) => {
       }
     }
     
+    // Cleanup function to close WebSocket on unmount
     return () => {
-      // Cleanup on unmount
       isMounted.current = false;
+      
+      // Close WebSocket connection if it exists
       if (socketRef.current) {
+        console.log('WebSocket: Cleaning up WebSocket connection');
         socketRef.current.close(1000, 'Component unmounted');
+        socketRef.current = null;
       }
-      if (pingInterval.current) {
-        clearInterval(pingInterval.current);
-      }
+      
+      // Clear any pending timeouts or intervals
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      if (pingInterval.current) {
+        clearInterval(pingInterval.current);
+        pingInterval.current = null;
       }
     };
   }, [isAuthenticated, loading, connectWebSocket]);
