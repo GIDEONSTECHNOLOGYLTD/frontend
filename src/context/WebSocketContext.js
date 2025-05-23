@@ -95,6 +95,7 @@ export const WebSocketProvider = ({ children }) => {
     const token = localStorage.getItem(AUTH_TOKEN);
     if (!token) {
       console.log('No auth token available, skipping WebSocket connection');
+      cleanupWebSocket(1000, 'No auth token');
       return;
     }
     
@@ -102,6 +103,7 @@ export const WebSocketProvider = ({ children }) => {
     if (loading || !isMounted.current) {
       console.log('WebSocket: Skipping connection -', 
         loading ? 'still loading' : 'unmounted');
+      cleanupWebSocket(1000, 'Loading or unmounted');
       return;
     }
     
@@ -259,6 +261,12 @@ export const WebSocketProvider = ({ children }) => {
     };
   }, [isAuthenticated, loading, cleanupWebSocket]);
   
+  // Memoize the cleanup function to prevent unnecessary re-renders
+  const stableCleanupWebSocket = useCallback(cleanupWebSocket, []);
+  
+  // Create a ref to track if we've already connected
+  const hasConnectedRef = useRef(false);
+  
   // Effect to handle authentication state changes
   useEffect(() => {
     // Set mounted state
@@ -269,24 +277,20 @@ export const WebSocketProvider = ({ children }) => {
       console.log('WebSocket: Waiting for auth to load...');
       return () => {
         isMounted.current = false;
-        cleanupWebSocket(1000, 'Component unmounted');
       };
     }
     
-    // Function to handle connection logic
-    const handleConnection = () => {
-      // If authenticated and not already connected, connect
-      if (isAuthenticated) {
-        console.log('WebSocket: User authenticated, attempting to connect...');
-        connectWebSocket();
-      } else {
-        // Close WebSocket if user logs out or is not authenticated
-        console.log('WebSocket: User not authenticated, cleaning up...');
-        cleanupWebSocket(1000, 'User not authenticated');
-      }
-    };
-    
-    handleConnection();
+    // If authenticated and not already connected, connect
+    if (isAuthenticated && !hasConnectedRef.current) {
+      console.log('WebSocket: User authenticated, attempting to connect...');
+      hasConnectedRef.current = true;
+      connectWebSocket();
+    } else if (!isAuthenticated) {
+      // Close WebSocket if user logs out or is not authenticated
+      console.log('WebSocket: User not authenticated, cleaning up...');
+      hasConnectedRef.current = false;
+      stableCleanupWebSocket(1000, 'User not authenticated');
+    }
     
     // Cleanup function
     return () => {
@@ -304,10 +308,11 @@ export const WebSocketProvider = ({ children }) => {
       }
       
       // Clean up WebSocket when auth state changes
-      cleanupWebSocket(1000, 'Component unmounted or auth state changed');
+      if (hasConnectedRef.current) {
+        stableCleanupWebSocket(1000, 'Component unmounted or auth state changed');
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, loading]); // Removed connectWebSocket and cleanupWebSocket from deps to prevent infinite loops
+  }, [isAuthenticated, loading, connectWebSocket, stableCleanupWebSocket]);
 
   // Provide the WebSocket context
   const value = useMemo(() => ({
