@@ -13,7 +13,6 @@ import PrivateRoute from './components/routing/PrivateRoute';
 import TaskRoutes from './routes/TaskRoutes';
 import DocumentRoutes from './routes/DocumentRoutes';
 import SearchPage from './pages/SearchPage';
-import WebSocketTest from './components/WebSocketTest';
 
 // Create a theme instance
 const theme = createTheme({
@@ -102,16 +101,6 @@ function App() {
                       element={
                         <AppLayout>
                           <SearchPage />
-                        </AppLayout>
-                      } 
-                    />
-                    
-                    {/* WebSocket Test route */}
-                    <Route 
-                      path="/ws-test" 
-                      element={
-                        <AppLayout>
-                          <WebSocketTest />
                         </AppLayout>
                       } 
                     />
