@@ -127,13 +127,7 @@ const AdminPanel = () => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        const token = localStorage.getItem('authToken');
-        await axios.delete(`${API_URL}/admin/users/${userId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
+        await api.delete(`/admin/users/${userId}`);
         setUsers(users.filter(user => user._id !== userId));
         showSnackbar('User deleted successfully', 'success');
       } catch (err) {
@@ -145,18 +139,7 @@ const AdminPanel = () => {
   const handleAddAdmin = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('authToken');
-      await axios.post(
-        `${API_URL}/admin/make-admin`,
-        { email },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      
+      await api.post('/admin/make-admin', { email });
       setEmail('');
       setOpenDialog(false);
       await fetchUsers();
