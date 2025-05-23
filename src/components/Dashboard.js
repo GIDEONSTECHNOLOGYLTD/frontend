@@ -149,7 +149,7 @@ const Dashboard = () => {
         const token = localStorage.getItem('gts_token');
         
         // Fetch dashboard statistics
-        const statsResponse = await axios.get(`${API_URL}/dashboard/stats`, {
+        const statsResponse = await axios.get(`${API_URL}/api/v1/dashboard/stats`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
