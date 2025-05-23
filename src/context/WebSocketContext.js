@@ -5,15 +5,24 @@ import { AUTH_TOKEN } from '../../config';
 // Safe auth hook with proper error handling
 const useSafeAuth = () => {
   try {
-    const auth = useAuth?.() || {}; // Safely call useAuth
+    const auth = useAuth?.();
+    // Return default values if auth is not available yet
+    if (!auth) {
+      return { 
+        user: null, 
+        loading: true, 
+        isAuthenticated: false,
+        token: null
+      };
+    }
     return {
-      user: auth?.user || null,
-      loading: auth?.loading ?? false,
-      isAuthenticated: auth?.isAuthenticated || false,
-      token: auth?.token || null
+      user: auth.user || null,
+      loading: auth.loading ?? false,
+      isAuthenticated: !!auth.user,
+      token: localStorage.getItem(AUTH_TOKEN)
     };
   } catch (error) {
-    console.warn('AuthContext not available, using fallback');
+    console.warn('AuthContext not available, using fallback', error);
     return { 
       user: null, 
       loading: false, 
@@ -39,8 +48,15 @@ export const WebSocketProvider = ({ children }) => {
   
   // Memoize the connectWebSocket function
   const connectWebSocket = useCallback(() => {
-    if (!isMounted.current || loading) {
-      console.log('Skipping WebSocket connection: loading or unmounted');
+    // Don't attempt to connect if we're still loading or unmounted
+    if (loading || !isMounted.current) {
+      console.log('WebSocket: Skipping connection -', loading ? 'still loading' : 'unmounted');
+      return null;
+    }
+    
+    // Don't connect if user is not authenticated
+    if (!isAuthenticated) {
+      console.log('WebSocket: Not authenticated, skipping connection');
       return null;
     }
     
@@ -186,10 +202,19 @@ export const WebSocketProvider = ({ children }) => {
   
   // Effect to handle authentication state changes
   useEffect(() => {
-    if (isAuthenticated && !loading) {
+    // Only proceed if we're not in a loading state
+    if (loading) {
+      console.log('WebSocket: Waiting for auth to load...');
+      return;
+    }
+    
+    // If authenticated and not already connected, connect
+    if (isAuthenticated) {
+      console.log('WebSocket: User authenticated, attempting to connect...');
       connectWebSocket();
     } else {
-      // Close WebSocket if user logs out
+      // Close WebSocket if user logs out or is not authenticated
+      console.log('WebSocket: User not authenticated, cleaning up...');
       if (socketRef.current) {
         socketRef.current.close(1000, 'User logged out');
         socketRef.current = null;
