@@ -91,6 +91,12 @@ export const WebSocketProvider = ({ children }) => {
   
   // Connect to WebSocket
   const connectWebSocket = useCallback(() => {
+    // Check if we're already connecting/connected
+    if (socketRef.current && (socketRef.current.readyState === WebSocket.CONNECTING || socketRef.current.readyState === WebSocket.OPEN)) {
+      console.log('WebSocket: Connection already in progress or established');
+      return;
+    }
+    
     // Don't attempt to connect if we don't have a token
     const token = localStorage.getItem(AUTH_TOKEN);
     if (!token) {
@@ -266,35 +272,55 @@ export const WebSocketProvider = ({ children }) => {
   
   // Create a ref to track if we've already connected
   const hasConnectedRef = useRef(false);
+  const isConnectingRef = useRef(false);
+  
+  // Memoize the connection handler to prevent unnecessary re-renders
+  const handleConnection = useCallback(async () => {
+    // Only proceed if we're not in a loading state
+    if (loading || !isMounted.current) {
+      console.log('WebSocket: Waiting for auth to load or component unmounted');
+      return;
+    }
+    
+    // If authenticated and not already connected or connecting, connect
+    if (isAuthenticated && !hasConnectedRef.current && !isConnectingRef.current) {
+      console.log('WebSocket: User authenticated, attempting to connect...');
+      isConnectingRef.current = true;
+      hasConnectedRef.current = true;
+      
+      try {
+        await connectWebSocket();
+      } catch (error) {
+        console.error('WebSocket connection failed:', error);
+        if (isMounted.current) {
+          setConnectionStatus('error');
+        }
+      } finally {
+        if (isMounted.current) {
+          isConnectingRef.current = false;
+        }
+      }
+    } else if (!isAuthenticated) {
+      // Close WebSocket if user logs out or is not authenticated
+      console.log('WebSocket: User not authenticated, cleaning up...');
+      hasConnectedRef.current = false;
+      isConnectingRef.current = false;
+      stableCleanupWebSocket(1000, 'User not authenticated');
+    }
+  }, [isAuthenticated, loading, connectWebSocket, stableCleanupWebSocket]);
   
   // Effect to handle authentication state changes
   useEffect(() => {
     // Set mounted state
     isMounted.current = true;
     
-    // Only proceed if we're not in a loading state
-    if (loading) {
-      console.log('WebSocket: Waiting for auth to load...');
-      return () => {
-        isMounted.current = false;
-      };
-    }
-    
-    // If authenticated and not already connected, connect
-    if (isAuthenticated && !hasConnectedRef.current) {
-      console.log('WebSocket: User authenticated, attempting to connect...');
-      hasConnectedRef.current = true;
-      connectWebSocket();
-    } else if (!isAuthenticated) {
-      // Close WebSocket if user logs out or is not authenticated
-      console.log('WebSocket: User not authenticated, cleaning up...');
-      hasConnectedRef.current = false;
-      stableCleanupWebSocket(1000, 'User not authenticated');
-    }
+    // Handle the connection
+    handleConnection();
     
     // Cleanup function
     return () => {
       isMounted.current = false;
+      isConnectingRef.current = false;
       
       // Clear any pending timeouts or intervals
       if (reconnectTimeoutRef.current) {
