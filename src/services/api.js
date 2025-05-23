@@ -7,7 +7,6 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  withCredentials: true, // Important for cookies, authorization headers with HTTPS
   timeout: 15000, // 15 seconds timeout
 });
 
@@ -21,10 +20,14 @@ api.interceptors.request.use(
     
     const token = localStorage.getItem('gts_token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      // Only add the token if it's not already set in the headers
+      if (!config.headers.Authorization) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     } else {
-      // If no token, redirect to login
+      // If no token and we're not on the login page, redirect to login
       if (window.location.pathname !== '/login') {
+        console.warn('No auth token found, redirecting to login');
         window.location.href = '/login';
       }
       return Promise.reject(new Error('No authentication token found'));
@@ -32,21 +35,35 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
-// Add response interceptor to handle 401 errors
+// Add response interceptor to handle authentication errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // If the error is 401, clear token and redirect to login
-    if (error.response?.status === 401) {
+    const originalRequest = error.config;
+    
+    // If the error is 401 and we haven't already retried
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      console.warn('Received 401, removing token and redirecting to login');
       localStorage.removeItem('gts_token');
+      
+      // Redirect to login if not already there
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
+    
+    // Log the error for debugging
+    console.error('API Error:', {
+      url: originalRequest.url,
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
     
     return Promise.reject(error);
   }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/auth/AuthContext';
-import axios from 'axios';
-import { API_URL } from '../../config';
+import api from '../../services/api';
 import {
   Table,
   TableBody,
@@ -43,20 +42,9 @@ const AdminPanel = () => {
       setLoading(true);
       setError('');
       
-      // Get token from localStorage
-      const token = localStorage.getItem('gts_token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      console.log('Fetching users with token:', token.substring(0, 10) + '...');
+      console.log('Fetching users...');
       
-      const response = await axios.get(`${API_URL}/admin/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await api.get('/admin/users');
       
       console.log('Users fetched successfully:', response.data.data);
       setUsers(response.data.data);
@@ -69,13 +57,6 @@ const AdminPanel = () => {
       });
       
       setError(errorMessage);
-      
-      // If unauthorized, redirect to login
-      if (err.response?.status === 401) {
-        // Clear any existing auth data
-        localStorage.removeItem('token');
-        window.location.href = '/login';
-      }
     } finally {
       setLoading(false);
     }
@@ -91,12 +72,6 @@ const AdminPanel = () => {
     try {
       setLoading(true);
       
-      // Get the token from localStorage
-      const token = localStorage.getItem('gts_token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-      
       // Find the user to update
       const userToUpdate = users.find(u => u._id === userId);
       if (!userToUpdate) {
@@ -109,16 +84,9 @@ const AdminPanel = () => {
       });
       
       // Make the API call to promote user to admin
-      const response = await axios.post(
-        `${API_URL}/admin/make-admin`,
-        { email: userToUpdate.email },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        }
+      const response = await api.post(
+        '/admin/make-admin',
+        { email: userToUpdate.email }
       );
       
       console.log('Promote to admin response:', response.data);
