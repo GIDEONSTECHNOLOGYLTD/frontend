@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/auth/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../../config';
@@ -38,49 +38,123 @@ const AdminPanel = () => {
     severity: 'success'
   });
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
-      const token = localStorage.getItem('authToken');
+      setLoading(true);
+      setError('');
+      
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      console.log('Fetching users with token:', token.substring(0, 10) + '...');
+      
       const response = await axios.get(`${API_URL}/admin/users`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        withCredentials: true
       });
+      
+      console.log('Users fetched successfully:', response.data.data);
       setUsers(response.data.data);
     } catch (err) {
-      setError('Failed to fetch users');
-      showSnackbar('Failed to fetch users', 'error');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch users';
+      console.error('Error fetching users:', {
+        error: errorMessage,
+        status: err.response?.status,
+        data: err.response?.data
+      });
+      
+      setError(errorMessage);
+      
+      // If unauthorized, redirect to login
+      if (err.response?.status === 401) {
+        // Clear any existing auth data
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (user?.role === 'admin') {
       fetchUsers();
     }
-  }, [user]);
+  }, [user, fetchUsers]);
 
   const handleMakeAdmin = async (userId) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const userToUpdate = users.find(u => u._id === userId);
+      setLoading(true);
       
-      await axios.post(
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      // Find the user to update
+      const userToUpdate = users.find(u => u._id === userId);
+      if (!userToUpdate) {
+        throw new Error('User not found');
+      }
+      
+      console.log('Promoting user to admin:', {
+        userId: userToUpdate._id,
+        email: userToUpdate.email
+      });
+      
+      // Make the API call to promote user to admin
+      const response = await axios.post(
         `${API_URL}/admin/make-admin`,
         { email: userToUpdate.email },
         {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          withCredentials: true
         }
       );
       
+      console.log('Promote to admin response:', response.data);
+      
+      // Refresh the users list
       await fetchUsers();
-      showSnackbar('User promoted to admin successfully', 'success');
+      
+      // Show success message
+      showSnackbar(
+        response.data.message || 'User promoted to admin successfully', 
+        'success'
+      );
+      
     } catch (err) {
-      showSnackbar(err.response?.data?.error || 'Failed to promote user', 'error');
+      const errorMessage = err.response?.data?.message || 
+                         err.response?.data?.error || 
+                         err.message || 
+                         'Failed to promote user to admin';
+      
+      console.error('Error promoting user to admin:', {
+        error: errorMessage,
+        status: err.response?.status,
+        data: err.response?.data
+      });
+      
+      showSnackbar(errorMessage, 'error');
+      
+      // If unauthorized, redirect to login
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
