@@ -123,6 +123,7 @@ class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
+    console.log('ErrorBoundary initialized');
   }
 
   static getDerivedStateFromError(error) {
