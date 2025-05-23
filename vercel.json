@@ -5,34 +5,19 @@
   ],
   "routes": [
     { "src": "/static/(.*)", "dest": "/static/$1" },
-    { "src": "/asset-manifest.json", "dest": "/asset-manifest.json", "headers": { "cache-control": "public, max-age=0, must-revalidate" } },
-    { "src": "/manifest.json", "dest": "/manifest.json" },
-    { "src": "/logo(?:192|512).png", "dest": "/logo$1.png" },
-    { "src": "/favicon.ico", "dest": "/favicon.ico" },
-    { "src": "/ws", "dest": "https://gideons-tech-suite.onrender.com/ws" },
-    { "src": "^/(.*)", "dest": "/index.html" }
+    { "src": "/(.*\\.(js|css|json|png|jpg|jpeg|gif|ico))", "dest": "/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://gideons-tech-suite.onrender.com/api/$1" }
+    { "source": "/ws", "destination": "https://gideons-tech-suite.onrender.com/ws" }
   ],
   "headers": [
     {
-      "source": "/api/(.*)",
+      "source": "/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT,WEBSOCKET" },
         { "key": "Access-Control-Allow-Headers", "value": "X-Requested-With, Content-Type, Authorization, X-CSRF-Token, Accept, Accept-Version, Content-Length, Content-MD5, Date, X-Api-Version" }
-      ]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Referrer-Policy", "value": "same-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
       ]
     }
   ]
