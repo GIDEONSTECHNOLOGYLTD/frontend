@@ -21,6 +21,7 @@ import {
   Dashboard as DashboardIcon,
   Assignment as TasksIcon,
   Description as DocumentsIcon,
+  AdminPanelSettings as AdminPanelIcon,
   ExitToApp as LogoutIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon
@@ -83,6 +84,11 @@ const Layout = ({ children }) => {
     { text: 'Tasks', icon: <TasksIcon />, path: '/tasks' },
     { text: 'Documents', icon: <DocumentsIcon />, path: '/documents' },
   ];
+
+  // Add Admin Panel if user is admin
+  if (user?.role === 'admin') {
+    menuItems.push({ text: 'Admin Panel', icon: <AdminPanelIcon />, path: '/admin' });
+  }
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>

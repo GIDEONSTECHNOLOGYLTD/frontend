@@ -13,6 +13,8 @@ import PrivateRoute from './components/routing/PrivateRoute';
 import TaskRoutes from './routes/TaskRoutes';
 import DocumentRoutes from './routes/DocumentRoutes';
 import SearchPage from './pages/SearchPage';
+import AdminPanel from './components/admin/AdminPanel';
+// Main app imports
 
 // Create a theme instance
 const theme = createTheme({
@@ -104,6 +106,18 @@ function App() {
                         </AppLayout>
                       } 
                     />
+                    
+                    {/* Admin route - only accessible by admins */}
+                    <Route element={<PrivateRoute adminOnly />}>
+                      <Route 
+                        path="/admin" 
+                        element={
+                          <AppLayout>
+                            <AdminPanel />
+                          </AppLayout>
+                        } 
+                      />
+                    </Route>
                     
                     {/* Fallback route */}
                     <Route path="*" element={<Navigate to="/" replace />} />
