@@ -1,8 +1,14 @@
 {
   "name": "frontend",
   "version": "0.1.0",
-  "homepage": "/",
-  "proxy": "http://localhost:5005",
+  "homepage": ".",
+  "proxy": {
+    "/api": {
+      "target": "https://gideons-tech-suite.onrender.com",
+      "changeOrigin": true,
+      "secure": true
+    }
+  },
   "private": true,
   "resolutions": {
     "ajv": "6.12.6",
@@ -38,7 +44,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "NODE_OPTIONS=--max_old_space_size=4096 react-scripts build",
+    "build": "GENERATE_SOURCEMAP=false PUBLIC_URL=. react-scripts build",
     "test": "react-scripts test --watchAll=false",
     "test:watch": "react-scripts test",
     "test:coverage": "react-scripts test --coverage --watchAll=false",
