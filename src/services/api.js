@@ -98,9 +98,7 @@ const api = axios.create({
   validateStatus: function (status) {
     // Resolve for all status codes less than 500
     return status < 500;
-  },
-  // Enable cross-site cookie handling
-  withXSRFToken: true
+  }
 });
 
 // Debug log API configuration
