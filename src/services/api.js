@@ -1,136 +1,269 @@
 import axios from 'axios';
 
+// Constants
+const API_TIMEOUT = 15000; // 15 seconds
+
+// Helper function to create a cancellable request
+const createCancellableRequest = () => {
+  const source = axios.CancelToken.source();
+  
+  const cancel = (message = 'Request cancelled by the user') => {
+    source.cancel(message);
+  };
+
+  return {
+    cancel,
+    token: source.token
+  };
+};
+
+// Helper function to handle API errors consistently
+const handleApiError = (error) => {
+  if (error.isCancelled) {
+    return Promise.reject(error);
+  }
+
+  // Handle network errors
+  if (error.isNetworkError) {
+    return Promise.reject({
+      message: error.message || 'Network error occurred',
+      isNetworkError: true,
+      originalError: error.originalError
+    });
+  }
+
+  // Handle authentication errors
+  if (error.isAuthError) {
+    return Promise.reject({
+      message: error.message || 'Authentication required',
+      isAuthError: true,
+      statusCode: error.statusCode
+    });
+  }
+
+  // Handle validation errors
+  if (error.response?.status === 422) {
+    return Promise.reject({
+      message: 'Validation failed',
+      isValidationError: true,
+      errors: error.response.data?.errors || {},
+      statusCode: 422
+    });
+  }
+
+  // Handle server errors
+  if (error.response?.status >= 500) {
+    return Promise.reject({
+      message: 'Server error occurred. Please try again later.',
+      isServerError: true,
+      statusCode: error.response.status,
+      originalError: error
+    });
+  }
+
+  // Handle other errors
+  return Promise.reject({
+    message: error.response?.data?.message || 'An unexpected error occurred',
+    statusCode: error.response?.status,
+    originalError: error
+  });
+};
+
+// Export utility functions
+export { createCancellableRequest, handleApiError };
+
 // Create axios instance with base URL
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5005/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
   },
-  withCredentials: true, // Important: This is required for cookies to be sent with requests
-  timeout: 15000, // 15 seconds timeout
+  withCredentials: true,
+  timeout: API_TIMEOUT,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+  validateStatus: function (status) {
+    // Resolve only if the status code is less than 500
+    return status < 500;
+  }
 });
 
-console.log('API Base URL:', api.defaults.baseURL); // Debug log
+// Debug log API configuration
+if (process.env.NODE_ENV === 'development') {
+  console.log('API Configuration:', {
+    baseURL: api.defaults.baseURL,
+    timeout: api.defaults.timeout,
+    withCredentials: api.defaults.withCredentials
+  });
+}
 
-// Add request interceptor to add auth token to requests
+// Request interceptor for adding auth token and request tracking
 api.interceptors.request.use(
   (config) => {
-    // Skip authentication for auth endpoints and health check
-    if (config.url.includes('/auth/') || config.url.includes('/health')) {
-      return config;
-    }
+    // Create a new CancelToken for each request
+    const source = axios.CancelToken.source();
+    config.cancelToken = source.token;
+
+    // Add request timestamp for timeout handling
+    config.metadata = { 
+      startTime: new Date(),
+      retryCount: 0,
+      source
+    };
+
+    // Check if this is an auth or health check endpoint
+    const isAuthEndpoint = config.url.includes('/auth/') || 
+                         config.url.endsWith('/auth') ||
+                         config.url.includes('/health');
     
-    // Don't override the Authorization header if it's already set
-    if (config.headers.Authorization) {
-      return config;
-    }
+    // Get token from localStorage
+    const token = localStorage.getItem('token');
     
-    // Try to get token from localStorage
-    const token = localStorage.getItem('gts_token');
-    if (token) {
+    // If token exists and it's not an auth endpoint, add it to the headers
+    if (token && !isAuthEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      console.warn('No auth token found in localStorage');
     }
-    
+
+    // Add request ID for tracking if not already set
+    if (!config.headers['x-request-id']) {
+      config.headers['x-request-id'] = crypto.randomUUID();
+    }
+
+    // Add CORS headers for non-simple requests
+    if (config.method !== 'get' && config.method !== 'head') {
+      config.headers['Content-Type'] = 'application/json';
+    }
+
+    // Log request in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[API]', config.method.toUpperCase(), config.url, {
+        params: config.params,
+        data: config.data,
+        headers: config.headers
+      });
+    }
+
     return config;
   },
   (error) => {
-    console.error('Request interceptor error:', error);
-    return Promise.reject(error);
+    // Handle request error
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[API] Request Error:', error);
+    }
+    return Promise.reject(handleApiError(error));
   }
 );
 
-// Add response interceptor to handle authentication errors and common API responses
+// Response interceptor for handling responses and errors
 api.interceptors.response.use(
   (response) => {
     // Log successful API calls in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('API Response:', {
+      console.log('[API] Response:', {
         url: response.config.url,
         status: response.status,
         data: response.data,
+        headers: response.headers
       });
     }
-    return response;
+    
+    // Return the response data directly for successful responses
+    return response.data;
   },
-  async (error) => {
-    const originalRequest = error?.config;
-    
-    // Handle network errors
-    if (!error.response) {
-      console.error('Network Error:', error.message);
-      return Promise.reject({
-        message: 'Unable to connect to the server. Please check your internet connection.',
-        isNetworkError: true,
-        originalError: error
-      });
-    }
-    
-    // Log the error for debugging
-    const errorData = {
-      url: originalRequest?.url,
+  (error) => {
+    // Enhanced error handling
+    const errorResponse = {
+      message: 'An error occurred',
+      isNetworkError: false,
       status: error.response?.status,
-      statusText: error.response?.statusText,
       data: error.response?.data,
-      config: originalRequest ? {
-        method: originalRequest.method,
-        headers: originalRequest.headers,
-        data: originalRequest.data,
-      } : {},
+      originalError: error
     };
-    
-    console.error('API Error:', errorData);
-    
-    // Handle 401 Unauthorized errors
-    if (error.response?.status === 401) {
-      console.warn('Authentication required, redirecting to login');
+
+    // Handle network errors (no response from server)
+    if (!error.response) {
+      errorResponse.message = 'Unable to connect to the server. Please check your internet connection.';
+      errorResponse.isNetworkError = true;
       
-      // Only redirect if we're not already on the login page
-      if (window.location.pathname !== '/login') {
-        // Clear the token from localStorage
-        localStorage.removeItem('gts_token');
-        // Redirect to login page with a return URL
-        const returnUrl = window.location.pathname + window.location.search;
-        window.location.href = `/login?returnUrl=${encodeURIComponent(returnUrl)}`;
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[API] Network Error:', error.message);
       }
       
-      return Promise.reject({
-        ...error,
-        message: 'Your session has expired. Please log in again.',
-        requiresAuth: true
+      return Promise.reject(handleApiError(errorResponse));
+    }
+
+    // Handle HTTP status codes
+    const { status } = error.response;
+    const { statusText, data } = error.response;
+    const endTime = new Date();
+    const duration = error.config?.metadata?.startTime 
+      ? endTime - error.config.metadata.startTime 
+      : 0;
+
+    // Log error details in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`[API] ${status} ${error.config?.method?.toUpperCase() || 'UNKNOWN'} ${error.config?.url || 'unknown-url'} (${duration}ms)`, {
+        status,
+        statusText,
+        data,
+        error: error.message,
+        config: error.config
       });
     }
-    
-    // Handle other error statuses
-    if (error.response?.status >= 500) {
-      return Promise.reject({
-        ...error,
-        message: 'A server error occurred. Please try again later.',
-        isServerError: true
-      });
+
+    // Handle different HTTP status codes
+    switch (status) {
+      case 400:
+        errorResponse.message = data?.message || 'Bad request';
+        break;
+        
+      case 401:
+        errorResponse.message = data?.message || 'Your session has expired. Please log in again.';
+        errorResponse.isAuthError = true;
+        // Clear auth data and redirect to login
+        localStorage.removeItem('token');
+        if (window.location.pathname !== '/login') {
+          const returnUrl = window.location.pathname + window.location.search;
+          window.location.href = `/login?sessionExpired=true&returnUrl=${encodeURIComponent(returnUrl)}`;
+        }
+        break;
+        
+      case 403:
+        errorResponse.message = 'You do not have permission to perform this action';
+        errorResponse.isForbidden = true;
+        break;
+        
+      case 404:
+        errorResponse.message = 'The requested resource was not found';
+        errorResponse.isNotFound = true;
+        break;
+        
+      case 422:
+        errorResponse.message = 'Validation failed';
+        errorResponse.isValidationError = true;
+        errorResponse.errors = data?.errors || {};
+        break;
+        
+      case 429:
+        errorResponse.message = 'Too many requests. Please try again later.';
+        errorResponse.isRateLimited = true;
+        break;
+        
+      case 500:
+        errorResponse.message = 'An unexpected server error occurred. Please try again later.';
+        errorResponse.isServerError = true;
+        break;
+        
+      default:
+        errorResponse.message = data?.message || 'An error occurred';
     }
     
-    // Handle 404 Not Found
-    if (error.response?.status === 404) {
-      return Promise.reject({
-        ...error,
-        message: 'The requested resource was not found.',
-        isNotFound: true
-      });
-    }
-    
-    // For other errors, include the server's error message if available
-    const serverMessage = error.response?.data?.message || error.response?.statusText;
-    if (serverMessage) {
-      return Promise.reject({
-        ...error,
-        message: serverMessage
-      });
-    }
-    
-    return Promise.reject(error);
+    // Return the error response
+    return Promise.reject(handleApiError(errorResponse));
   }
 );
 

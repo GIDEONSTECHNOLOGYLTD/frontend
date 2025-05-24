@@ -14,6 +14,7 @@ import TaskRoutes from './routes/TaskRoutes';
 import DocumentRoutes from './routes/DocumentRoutes';
 import SearchPage from './pages/SearchPage';
 import AdminPanel from './components/admin/AdminPanel';
+import TestApi from './components/TestApi';
 // Main app imports
 
 // Create a theme instance
@@ -118,6 +119,16 @@ function App() {
                         } 
                       />
                     </Route>
+                    
+                    {/* Test API route - for development only */}
+                    <Route 
+                      path="/test-api" 
+                      element={
+                        <AppLayout>
+                          <TestApi />
+                        </AppLayout>
+                      } 
+                    />
                     
                     {/* Fallback route */}
                     <Route path="*" element={<Navigate to="/" replace />} />
