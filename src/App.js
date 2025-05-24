@@ -1,7 +1,12 @@
 import React, { Component } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
+import { 
+  CssBaseline, 
+  Box, 
+  Typography, 
+  Button 
+} from '@mui/material';
 import { AuthProvider } from './context/auth/AuthContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { SearchProvider } from './context/SearchContext';
@@ -166,38 +171,61 @@ class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
-    console.log('ErrorBoundary initialized');
   }
 
   static getDerivedStateFromError(error) {
+    console.error('Error caught by ErrorBoundary:', error);
     return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    console.error('Error caught by ErrorBoundary:', error, errorInfo);
+    // You can log the error to an error reporting service here
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '20px', textAlign: 'center' }}>
-          <h2>Something went wrong</h2>
-          <p>{this.state.error?.message || 'Unknown error occurred'}</p>
-          <button onClick={() => window.location.reload()}>Reload Page</button>
-        </div>
+        <Box 
+          display="flex" 
+          flexDirection="column" 
+          justifyContent="center" 
+          alignItems="center" 
+          minHeight="100vh"
+          p={3}
+          sx={{
+            backgroundColor: 'background.default',
+            color: 'text.primary'
+          }}
+        >
+          <Typography variant="h4" component="h1" gutterBottom>
+            Something went wrong
+          </Typography>
+          <Typography variant="body1" paragraph>
+            We're sorry for the inconvenience. The error has been logged.
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => window.location.reload()}
+            size="large"
+          >
+            Reload Page
+          </Button>
+        </Box>
       );
     }
+
     return this.props.children;
   }
 }
 
-const AppWithErrorBoundary = () => {
-  console.log('Rendering App component');
+function AppWithErrorBoundary() {
   return (
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
   );
-};
+}
 
 export default AppWithErrorBoundary;
