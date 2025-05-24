@@ -80,7 +80,19 @@
 
   <script>
     // API configuration
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+    // Use the production API URL by default, fallback to development URL
+    const API_BASE_URL = 'https://gideons-tech-suite.onrender.com/api';
+    
+    // Helper to handle API responses consistently
+    async function handleApiResponse(response) {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(data.message || 'API request failed');
+        error.response = { status: response.status, data };
+        throw error;
+      }
+      return data;
+    }
     
     // DOM elements
     const runTestsBtn = document.getElementById('runTests');
@@ -117,17 +129,13 @@
       const testId = 'health-check';
       try {
         const response = await fetch(`${API_BASE_URL}/health`);
-        const data = await response.json();
-        
-        if (response.ok) {
-          updateTestResult(testId, 'success', '✅ Health check passed', data);
-          return true;
-        } else {
-          updateTestResult(testId, 'error', `❌ Health check failed: ${data.message || 'Unknown error'}`);
-          return false;
-        }
+        const data = await handleApiResponse(response);
+        updateTestResult(testId, 'success', '✅ Health check passed', data);
+        return true;
       } catch (error) {
-        updateTestResult(testId, 'error', `❌ Health check failed: ${error.message}`);
+        console.error('Health check failed:', error);
+        const errorMessage = error.response?.data?.message || error.message;
+        updateTestResult(testId, 'error', `❌ Health check failed: ${errorMessage}`);
         return false;
       }
     }
@@ -144,24 +152,23 @@
       try {
         const response = await fetch(`${API_BASE_URL}/auth/me`, {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include' // Important for sending cookies in CORS
         });
         
-        const data = await response.json();
+        const data = await handleApiResponse(response);
         
-        if (response.ok) {
-          updateTestResult(testId, 'success', '✅ Authentication successful', {
-            user: data.user,
-            permissions: data.permissions
-          });
-          return true;
-        } else {
-          updateTestResult(testId, 'error', `❌ Authentication failed: ${data.message || 'Invalid token'}`);
-          return false;
-        }
+        updateTestResult(testId, 'success', '✅ Authentication successful', {
+          user: data.user,
+          permissions: data.permissions
+        });
+        return true;
       } catch (error) {
-        updateTestResult(testId, 'error', `❌ Authentication test failed: ${error.message}`);
+        console.error('Auth test failed:', error);
+        const errorMessage = error.response?.data?.message || error.message;
+        updateTestResult(testId, 'error', `❌ Authentication failed: ${errorMessage}`);
         return false;
       }
     }
@@ -178,23 +185,23 @@
       try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include' // Important for sending cookies in CORS
         });
         
-        const data = await response.json();
+        const data = await handleApiResponse(response);
         
-        if (response.ok) {
-          updateTestResult(testId, 'success', `✅ ${testName} successful`, 
-            Array.isArray(data) ? { count: data.length } : { success: true }
-          );
-          return true;
-        } else {
-          updateTestResult(testId, 'error', `❌ ${testName} failed: ${data.message || 'Unknown error'}`);
-          return false;
-        }
+        updateTestResult(testId, 'success', `✅ ${testName} successful`, 
+          Array.isArray(data) ? { count: data.length } : data
+        );
+        return true;
       } catch (error) {
-        updateTestResult(testId, 'error', `❌ ${testName} failed: ${error.message}`);
+        console.error(`${testName} failed:`, error);
+        const errorMessage = error.response?.data?.message || error.message;
+        updateTestResult(testId, 'error', `❌ ${testName} failed: ${errorMessage}`);
         return false;
       }
     }
@@ -240,7 +247,13 @@
     }
     
     // Event listeners
-    runTestsBtn.addEventListener('click', runAllTests);
+    runTestsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      runAllTests().catch(error => {
+        console.error('Test failed:', error);
+        updateTestResult('test-error', 'error', `Tests failed: ${error.message}`);
+      });
+    });
     
     clearStorageBtn.addEventListener('click', () => {
       localStorage.removeItem('token');
