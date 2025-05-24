@@ -436,4 +436,104 @@ export const restoreDocumentVersion = async (documentId, versionId) => {
   }
 };
 
+// Audit Logs API
+const auditLogs = {
+  /**
+   * Get audit logs with filtering and pagination
+   * @param {Object} params - Query parameters
+   * @param {string} [params.action] - Filter by action type
+   * @param {string} [params.entity] - Filter by entity type
+   * @param {string} [params.status] - Filter by status (success/failure)
+   * @param {string} [params.search] - Search query
+   * @param {Date} [params.startDate] - Start date for filtering
+   * @param {Date} [params.endDate] - End date for filtering
+   * @param {number} [params.page=1] - Page number
+   * @param {number} [params.limit=20] - Items per page
+   * @returns {Promise<Object>} Audit logs with pagination
+   */
+  getAuditLogs: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    
+    // Add filters to query params
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (value instanceof Date) {
+          queryParams.append(key, value.toISOString());
+        } else {
+          queryParams.append(key, value);
+        }
+      }
+    });
+    
+    return api.get(`/admin/audit-logs?${queryParams.toString()}`);
+  },
+  
+  /**
+   * Get audit log by ID
+   * @param {string} id - Audit log ID
+   * @returns {Promise<Object>} Audit log details
+   */
+  getAuditLogById: (id) => {
+    return api.get(`/admin/audit-logs/${id}`);
+  },
+  
+  /**
+   * Get current user's audit logs
+   * @param {Object} params - Query parameters
+   * @param {number} [params.page=1] - Page number
+   * @param {number} [params.limit=20] - Items per page
+   * @returns {Promise<Object>} User's audit logs with pagination
+   */
+  getMyAuditLogs: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    
+    return api.get(`/admin/audit-logs/me?${queryParams.toString()}`);
+  },
+  
+  /**
+   * Get audit log statistics
+   * @returns {Promise<Object>} Audit log statistics
+   */
+  getAuditStats: () => {
+    return api.get('/admin/audit-logs/stats');
+  }
+};
+
+// Email Settings API
+const settings = {
+  /**
+   * Get email settings
+   * @returns {Promise<Object>} Email settings
+   */
+  getEmailSettings: async () => {
+    const response = await api.get('/admin/settings/email');
+    return response.data;
+  },
+
+  /**
+   * Update email settings
+   * @param {Object} settings - Email settings to update
+   * @returns {Promise<Object>} Updated email settings
+   */
+  updateEmailSettings: async (settings) => {
+    const response = await api.put('/admin/settings/email', settings);
+    return response.data;
+  },
+
+  /**
+   * Send test email
+   * @param {string} email - Email address to send test to
+   * @returns {Promise<Object>} Test email result
+   */
+  sendTestEmail: async (email) => {
+    const response = await api.post('/admin/settings/email/test', { email });
+    return response.data;
+  }
+};
+
+export { auditLogs, settings };
+
 export default api;

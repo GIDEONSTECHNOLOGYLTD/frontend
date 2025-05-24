@@ -13,7 +13,7 @@ import PrivateRoute from './components/routing/PrivateRoute';
 import TaskRoutes from './routes/TaskRoutes';
 import DocumentRoutes from './routes/DocumentRoutes';
 import SearchPage from './pages/SearchPage';
-import AdminPanel from './components/admin/AdminPanel';
+import { AdminDashboard, AuditLogs, Settings } from './pages/admin';
 import TestApi from './components/TestApi';
 // Main app imports
 
@@ -78,6 +78,34 @@ function App() {
                       } 
                     />
                     
+                    {/* Admin routes */}
+                    <Route path="/admin">
+                      <Route 
+                        index 
+                        element={
+                          <AppLayout>
+                            <AdminDashboard />
+                          </AppLayout>
+                        } 
+                      />
+                      <Route 
+                        path="audit-logs" 
+                        element={
+                          <AppLayout>
+                            <AuditLogs />
+                          </AppLayout>
+                        } 
+                      />
+                      <Route 
+                        path="settings" 
+                        element={
+                          <AppLayout>
+                            <Settings />
+                          </AppLayout>
+                        } 
+                      />
+                    </Route>
+                    
                     {/* Tasks routes */}
                     <Route 
                       path="/tasks/*" 
@@ -108,17 +136,17 @@ function App() {
                       } 
                     />
                     
-                    {/* Admin route - only accessible by admins */}
-                    <Route element={<PrivateRoute adminOnly />}>
-                      <Route 
-                        path="/admin" 
-                        element={
+                    {/* Admin routes */}
+                    <Route 
+                      path="/admin/*" 
+                      element={
+                        <PrivateRoute adminOnly>
                           <AppLayout>
-                            <AdminPanel />
+                            <AdminDashboard />
                           </AppLayout>
-                        } 
-                      />
-                    </Route>
+                        </PrivateRoute>
+                      } 
+                    />
                     
                     {/* Test API route - for development only */}
                     <Route 
@@ -130,8 +158,8 @@ function App() {
                       } 
                     />
                     
-                    {/* Fallback route */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
+                    {/* Catch all other routes */}
+                    <Route path="*" element={<Navigate to="/" />} />
                   </Route>
                 </Routes>
               </div>
