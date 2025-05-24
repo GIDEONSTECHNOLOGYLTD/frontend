@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/auth/AuthContext';
 import api from '../services/api';
 
@@ -20,8 +20,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip,
-  Stack,
 } from '@mui/material'; 
 import SearchIcon from '@mui/icons-material/Search';
 
@@ -36,190 +34,236 @@ import DocumentList from '../components/documents/DocumentList';
 import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
 import CreateFolderDialog from '../components/documents/CreateFolderDialog';
 
+// Main component
 const DocumentsPage = () => {
-  const { user } = useAuth();
-  const { projectId } = useParams();
+  // Hooks must be called at the top level
+  const { isAuthenticated } = useAuth();
+  const isMounted = useRef(true);
   
+  // State management
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState([]);
   const [filteredDocuments, setFilteredDocuments] = useState([]);
-  const [folders, setFolders] = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
-  const [breadcrumbs, setBreadcrumbs] = useState([]);
+  const [breadcrumbs] = useState([{ id: 'root', name: 'Home', type: 'root' }]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [error, setError] = useState('');
+  
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    hasMore: true
+  });
+  
+  // Loading states
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [fileTypeFilter, setFileTypeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
-  const [activeFilters, setActiveFilters] = useState([]);
-
-  // Apply search and filters to documents
-  const applyFilters = useCallback((docs) => {
+  
+  // Apply search and filters to documents (client-side fallback)
+  const applyFilters = useCallback((docs, search, type, sort) => {
     let result = [...docs];
     
-    // Apply search
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
+    // Apply search term filter
+    if (search) {
+      const searchLower = search.toLowerCase();
       result = result.filter(doc => 
-        doc.name.toLowerCase().includes(term) ||
-        (doc.description && doc.description.toLowerCase().includes(term)) ||
-        (doc.tags && doc.tags.some(tag => tag.toLowerCase().includes(term)))
+        doc.name.toLowerCase().includes(searchLower) ||
+        (doc.description && doc.description.toLowerCase().includes(searchLower))
       );
     }
     
     // Apply file type filter
-    if (fileTypeFilter !== 'all') {
-      result = result.filter(doc => {
-        const type = doc.fileType?.split('/')[0];
-        return type === fileTypeFilter;
-      });
+    if (type !== 'all') {
+      result = result.filter(doc => doc.type === type);
     }
     
     // Apply sorting
     result.sort((a, b) => {
-      if (sortBy === 'newest') {
+      if (sort === 'newest') {
         return new Date(b.createdAt) - new Date(a.createdAt);
-      } else if (sortBy === 'oldest') {
+      } else if (sort === 'oldest') {
         return new Date(a.createdAt) - new Date(b.createdAt);
-      } else if (sortBy === 'name-asc') {
+      } else if (sort === 'name-asc') {
         return a.name.localeCompare(b.name);
-      } else if (sortBy === 'name-desc') {
+      } else if (sort === 'name-desc') {
         return b.name.localeCompare(a.name);
       }
       return 0;
     });
     
     return result;
-  }, [searchTerm, fileTypeFilter, sortBy]);
+  }, []);
+  
+  // Handle folder click
+  const handleFolderClick = useCallback((folderId) => {
+    setCurrentFolder(folderId);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, []);
+  
+  // Clear all filters
+  const handleClearFilters = useCallback(() => {
+    setSearchTerm('');
+    setFileTypeFilter('all');
+    setSortBy('newest');
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, []);
+  
+  // Handle search form submission
+  const handleSearch = useCallback((e) => {
+    e.preventDefault();
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, []);
+  
+  // Export handleFolderClick for use in other components if needed
+  useEffect(() => {
+    window.handleFolderClick = handleFolderClick;
+    return () => {
+      delete window.handleFolderClick;
+    };
+  }, [handleFolderClick]);
+  
+  // Cleanup on unmount
+  useEffect(() => (() => {
+    isMounted.current = false;
+  }), []);
+  
+  // Fetch documents with pagination
+  const fetchDocuments = useCallback(async (isLoadMore = false) => {
+    if ((!isLoadMore && loading) || (isLoadMore && isLoadingMore)) return;
+
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    try {
+      if (isLoadMore) {
+        setIsLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+      
+      const response = await api.get('/api/documents', {
+        params: {
+          page: isLoadMore ? pagination.page + 1 : 1,
+          limit: pagination.limit,
+          folder: currentFolder?._id,
+          search: searchTerm,
+          type: fileTypeFilter,
+          sort: sortBy
+        },
+        signal
+      });
+      
+      if (!isMounted.current) return;
+      
+      const { data: newDocuments, total } = response.data;
+      
+      setPagination(prev => ({
+        ...prev,
+        page: isLoadMore ? prev.page + 1 : 1,
+        total,
+        hasMore: (isLoadMore ? documents.length : 0) + newDocuments.length < total
+      }));
+      
+      setDocuments(prev => isLoadMore ? [...prev, ...newDocuments] : newDocuments);
+      setFilteredDocuments(prev => isLoadMore ? [...prev, ...newDocuments] : newDocuments);
+      
+    } catch (err) {
+      if (!isMounted.current || err.name === 'AbortError') return;
+      setError('Failed to fetch documents');
+      console.error(err);
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+        setIsLoadingMore(false);
+      }
+    }
+    
+    return () => controller.abort();
+  }, [pagination, currentFolder, searchTerm, fileTypeFilter, sortBy, loading, isLoadingMore, documents.length]);
+
+  // Handle load more
+  const handleLoadMore = useCallback(() => {
+    if (!isLoadingMore && pagination.hasMore) {
+      fetchDocuments(true);
+    }
+  }, [isLoadingMore, pagination.hasMore, fetchDocuments]);
+
+  // Initial fetch and refetch when dependencies change
+  useEffect(() => {
+    fetchDocuments();
+    
+    return () => {
+      isMounted.current = false;
+    };
+  }, [currentFolder?._id, searchTerm, fileTypeFilter, sortBy, pagination.limit, fetchDocuments]);
   
   // Update filtered documents when documents or filters change
   useEffect(() => {
     if (documents.length > 0) {
-      const filtered = applyFilters(documents);
+      const filtered = applyFilters(documents, searchTerm, fileTypeFilter, sortBy);
       setFilteredDocuments(filtered);
     }
-  }, [documents, applyFilters]);
+  }, [documents, searchTerm, fileTypeFilter, sortBy, applyFilters]);
+  
+  // Early return for unauthenticated users - must be after all hooks
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  // Get active filters for display
+  const activeFilters = [];
+  if (searchTerm) {
+    activeFilters.push({
+      key: 'search',
+      label: `Search: ${searchTerm}`,
+      onRemove: () => setSearchTerm('')
+    });
+  }
+  
+  if (fileTypeFilter !== 'all') {
+    activeFilters.push({
+      key: 'fileType',
+      label: `Type: ${fileTypeFilter}`,
+      onRemove: () => setFileTypeFilter('all')
+    });
+  }
 
-  // Update active filters
-  useEffect(() => {
-    const newFilters = [];
-    
-    if (searchTerm) {
-      newFilters.push({
-        key: 'search',
-        type: 'search',
-        label: `Search: ${searchTerm}`,
-        value: searchTerm
-      });
-    }
-    
-    if (fileTypeFilter !== 'all') {
-      newFilters.push({
-        key: 'fileType',
-        type: 'fileType',
-        label: `Type: ${fileTypeFilter}`,
-        value: fileTypeFilter
-      });
-    }
-    
-    setActiveFilters(newFilters);
-  }, [searchTerm, fileTypeFilter]);
-
-  const fetchDocuments = useCallback(async (folderId = null) => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Fetch documents
-      const response = await api.get('/documents', { params: { projectId, folder: folderId } });
-      setDocuments(response.data.data || []);
-      
-      // Fetch folders
-      const foldersResponse = await api.get('/folders', { params: { projectId, parent: folderId } });
-      setFolders(foldersResponse.data.data || []);
-      
-      // Update current folder if folderId is provided
-      if (folderId) {
-        const folderResponse = await api.get(`/folders/${folderId}`);
-        setCurrentFolder(folderResponse.data.data);
-        
-        // Build breadcrumbs
-        const breadcrumbs = [];
-        let current = folderResponse.data.data;
-        
-        while (current) {
-          breadcrumbs.unshift({
-            id: current._id,
-            name: current.name,
-            type: 'folder'
-          });
-          
-          if (current.parent) {
-            const parentResponse = await api.get(`/folders/${current.parent._id}`);
-            current = parentResponse.data.data;
-          } else {
-            current = null;
-          }
-        }
-        
-        setBreadcrumbs([
-          { id: 'root', name: 'Home', type: 'root' },
-          ...breadcrumbs
-        ]);
-      } else {
-        // Root level - fetch folders
-        const response = await api.get('/folders', {
-          params: { project: projectId }
-        });
-        setFolders(response.data.data || []);
-        setBreadcrumbs([{ id: 'root', name: 'Home', type: 'root' }]);
-      }
-      
-    } catch (err) {
-      console.error('Error fetching documents:', err);
-      setError('Failed to load documents. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]); // Add projectId as a dependency
-
-  useEffect(() => {
-    if (user) {
-      fetchDocuments();
-    }
-  }, [currentFolder, projectId, fetchDocuments, user]);
-
-  const handleFolderClick = (folderId) => {
-    fetchDocuments(folderId);
-  };
-
+  // Handle breadcrumb click
   const handleBreadcrumbClick = (item) => {
     if (item.id === 'root') {
-      fetchDocuments();
+      setCurrentFolder(null);
     } else {
-      fetchDocuments(item.id);
+      setCurrentFolder(item.id);
     }
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
+  // Handle upload success
   const handleUploadSuccess = () => {
     setUploadDialogOpen(false);
-    fetchDocuments(currentFolder?._id);
+    fetchDocuments();
   };
 
+  // Handle create folder success
   const handleCreateFolderSuccess = () => {
     setFolderDialogOpen(false);
-    fetchDocuments(currentFolder?._id);
+    fetchDocuments();
   };
 
+  // Handle document click
   const handleDocumentClick = (document) => {
     // Open document preview or details
     console.log('Document clicked:', document);
   };
 
-  if (loading) {
+  if (loading && documents.length === 0) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
         <CircularProgress />
@@ -237,7 +281,7 @@ const DocumentsPage = () => {
             </Typography>
             
             {/* Search and Filter Bar */}
-            <Box sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap' }}>
+            <Box component="form" onSubmit={handleSearch} sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap' }}>
               <TextField
                 size="small"
                 placeholder="Search documents..."
@@ -250,10 +294,9 @@ const DocumentsPage = () => {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ minWidth: 250 }}
               />
               
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
                 <InputLabel>File Type</InputLabel>
                 <Select
                   value={fileTypeFilter}
@@ -261,14 +304,14 @@ const DocumentsPage = () => {
                   onChange={(e) => setFileTypeFilter(e.target.value)}
                 >
                   <MenuItem value="all">All Types</MenuItem>
-                  <MenuItem value="image">Images</MenuItem>
-                  <MenuItem value="application">Documents</MenuItem>
-                  <MenuItem value="video">Videos</MenuItem>
-                  <MenuItem value="audio">Audio</MenuItem>
+                  <MenuItem value="pdf">PDF</MenuItem>
+                  <MenuItem value="doc">Word</MenuItem>
+                  <MenuItem value="xls">Excel</MenuItem>
+                  <MenuItem value="img">Image</MenuItem>
                 </Select>
               </FormControl>
               
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
                 <InputLabel>Sort By</InputLabel>
                 <Select
                   value={sortBy}
@@ -282,104 +325,102 @@ const DocumentsPage = () => {
                 </Select>
               </FormControl>
               
-              {(searchTerm || fileTypeFilter !== 'all') && (
-                <Button 
-                  variant="outlined" 
-                  size="small" 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setFileTypeFilter('all');
-                    setSortBy('newest');
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              )}
+              <Button
+                variant="outlined"
+                onClick={handleClearFilters}
+                disabled={searchTerm === '' && fileTypeFilter === 'all' && sortBy === 'newest'}
+              >
+                Clear Filters
+              </Button>
             </Box>
             
             {/* Active Filters */}
             {activeFilters.length > 0 && (
-              <Box sx={{ mt: 1 }}>
-                <Stack direction="row" spacing={1} flexWrap="wrap">
-                  {activeFilters.map((filter, index) => (
-                    <Chip 
-                      key={index}
-                      label={filter.label}
-                      onDelete={() => {
-                        if (filter.type === 'search') setSearchTerm('');
-                        if (filter.type === 'fileType') setFileTypeFilter('all');
-                        setActiveFilters(prev => prev.filter(f => f.key !== filter.key));
-                      }}
-                      size="small"
-                      sx={{ mb: 1 }}
-                    />
-                  ))}
-                </Stack>
+              <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {activeFilters.map(filter => (
+                  <Button
+                    key={filter.key}
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    endIcon={filter.onRemove ? <span>&times;</span> : null}
+                    onClick={filter.onRemove}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    {filter.label}
+                  </Button>
+                ))}
               </Box>
             )}
-            
-            {/* Breadcrumbs */}
-            <Breadcrumbs aria-label="breadcrumb" sx={{ mt: 1 }}>
-              {breadcrumbs.map((item, index) => (
-                <Link
-                  key={item.id}
-                  color={index === breadcrumbs.length - 1 ? 'text.primary' : 'inherit'}
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleBreadcrumbClick(item);
-                  }}
-                  sx={{ display: 'flex', alignItems: 'center' }}
-                >
-                  {item.type === 'root' ? (
-                    <HomeIcon sx={{ mr: 0.5, fontSize: 20 }} />
-                  ) : (
-                    <FolderIcon sx={{ mr: 0.5, fontSize: 20 }} />
-                  )}
-                  {item.name}
-                </Link>
-              ))}
-            </Breadcrumbs>
           </Grid>
           
-          <Grid item>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<UploadFileIcon />}
-                onClick={() => setUploadDialogOpen(true)}
-              >
-                Upload
-              </Button>
-              <Button
-                variant="outlined"
-                color="primary"
-                startIcon={<CreateNewFolderIcon />}
-                onClick={() => setFolderDialogOpen(true)}
-              >
-                New Folder
-              </Button>
-            </Box>
+          <Grid item xs={12} md={4} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<UploadFileIcon />}
+              onClick={() => setUploadDialogOpen(true)}
+            >
+              Upload
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<CreateNewFolderIcon />}
+              onClick={() => setFolderDialogOpen(true)}
+            >
+              New Folder
+            </Button>
           </Grid>
         </Grid>
-
-        {error && (
-          <Box sx={{ mb: 3 }}>
-            <Typography color="error">{error}</Typography>
-          </Box>
-        )}
-
+        
+        {/* Breadcrumbs */}
+        <Box sx={{ mb: 3 }}>
+          <Breadcrumbs aria-label="breadcrumb">
+            {breadcrumbs.map((item, index) => (
+              <Link
+                key={index}
+                color={index === breadcrumbs.length - 1 ? 'text.primary' : 'inherit'}
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleBreadcrumbClick(item);
+                }}
+                sx={{ display: 'flex', alignItems: 'center' }}
+              >
+                {item.type === 'root' ? (
+                  <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+                ) : (
+                  <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+                )}
+                {item.name}
+              </Link>
+            ))}
+          </Breadcrumbs>
+        </Box>
+        
         <Paper elevation={2} sx={{ p: 3, minHeight: '60vh' }}>
+          {/* Document list */}
           <DocumentList 
             documents={filteredDocuments}
-            folders={folders}
-            onFolderClick={handleFolderClick}
-            onDocumentClick={handleDocumentClick}
-            currentFolder={currentFolder?._id}
-            onRefresh={() => fetchDocuments(currentFolder?._id)}
             loading={loading}
+            onDocumentClick={handleDocumentClick}
+            onFolderClick={handleFolderClick}
+            showSkeleton={loading && documents.length === 0}
           />
+          
+          {/* Load more button */}
+          {pagination.hasMore && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+              <Button
+                variant="outlined"
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                startIcon={isLoadingMore ? <CircularProgress size={20} /> : null}
+              >
+                {isLoadingMore ? 'Loading...' : 'Load More'}
+              </Button>
+            </Box>
+          )}
         </Paper>
       </Box>
 
@@ -388,17 +429,24 @@ const DocumentsPage = () => {
         open={uploadDialogOpen}
         onClose={() => setUploadDialogOpen(false)}
         onSuccess={handleUploadSuccess}
-        currentFolder={currentFolder?._id}
-        projectId={projectId}
+        currentFolder={currentFolder}
       />
-
+      
       <CreateFolderDialog
         open={folderDialogOpen}
         onClose={() => setFolderDialogOpen(false)}
         onSuccess={handleCreateFolderSuccess}
-        currentFolder={currentFolder?._id}
-        projectId={projectId}
+        parentFolder={currentFolder}
       />
+      
+      {/* Error Snackbar */}
+      {error && (
+        <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1400 }}>
+          <Paper elevation={3} sx={{ p: 2, bgcolor: 'error.main', color: 'white' }}>
+            <Typography>{error}</Typography>
+          </Paper>
+        </Box>
+      )}
     </Container>
   );
 };
