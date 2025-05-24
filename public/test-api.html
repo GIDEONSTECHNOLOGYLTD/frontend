@@ -80,14 +80,17 @@
 
   <script>
     // API configuration
-    // Use relative URL to work with the current domain
-    const API_BASE_URL = '/api/v1';
+    // Use the full URL to ensure it works in all environments
+    const API_BASE_URL = window.location.origin + '/api/v1';
+    
+    // Log the API base URL for debugging
+    console.log('API Base URL:', API_BASE_URL);
     
     // Check if we're running on the correct path
     if (!window.location.pathname.endsWith('test-api.html')) {
       // Redirect to the correct path if needed
       window.location.href = '/test-api.html';
-      throw new Error('Redirecting to correct path...');
+      return; // Prevent further execution
     }
     
     // Helper to handle API responses consistently
@@ -257,6 +260,15 @@
     document.addEventListener('DOMContentLoaded', () => {
       // Update the title to show we're connected
       document.title = "API Tester - " + window.location.hostname;
+      
+      // Display the current API URL
+      const apiUrlElement = document.createElement('div');
+      apiUrlElement.style.margin = '10px 0';
+      apiUrlElement.style.padding = '10px';
+      apiUrlElement.style.backgroundColor = '#f0f0f0';
+      apiUrlElement.style.borderRadius = '4px';
+      apiUrlElement.textContent = `API Endpoint: ${API_BASE_URL}`;
+      document.querySelector('h1').insertAdjacentElement('afterend', apiUrlElement);
     });
     
     // Event listeners
