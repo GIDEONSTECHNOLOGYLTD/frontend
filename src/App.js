@@ -78,32 +78,34 @@ function App() {
                       } 
                     />
                     
-                    {/* Admin routes */}
-                    <Route path="/admin">
-                      <Route 
-                        index 
-                        element={
-                          <AppLayout>
-                            <AdminDashboard />
-                          </AppLayout>
-                        } 
-                      />
-                      <Route 
-                        path="audit-logs" 
-                        element={
-                          <AppLayout>
-                            <AuditLogs />
-                          </AppLayout>
-                        } 
-                      />
-                      <Route 
-                        path="settings" 
-                        element={
-                          <AppLayout>
-                            <Settings />
-                          </AppLayout>
-                        } 
-                      />
+                    {/* Admin routes - only accessible to admin users */}
+                    <Route element={<PrivateRoute adminOnly={true} />}>
+                      <Route path="/admin">
+                        <Route 
+                          index 
+                          element={
+                            <AppLayout>
+                              <AdminDashboard />
+                            </AppLayout>
+                          } 
+                        />
+                        <Route 
+                          path="audit-logs" 
+                          element={
+                            <AppLayout>
+                              <AuditLogs />
+                            </AppLayout>
+                          } 
+                        />
+                        <Route 
+                          path="settings" 
+                          element={
+                            <AppLayout>
+                              <Settings />
+                            </AppLayout>
+                          } 
+                        />
+                      </Route>
                     </Route>
                     
                     {/* Tasks routes */}
