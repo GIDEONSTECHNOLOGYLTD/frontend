@@ -80,8 +80,15 @@
 
   <script>
     // API configuration
-    // Use the production API URL by default, fallback to development URL
-    const API_BASE_URL = 'https://gideons-tech-suite.onrender.com/api';
+    // Use relative URL to work with the current domain
+    const API_BASE_URL = '/api/v1';
+    
+    // Check if we're running on the correct path
+    if (!window.location.pathname.endsWith('test-api.html')) {
+      // Redirect to the correct path if needed
+      window.location.href = '/test-api.html';
+      throw new Error('Redirecting to correct path...');
+    }
     
     // Helper to handle API responses consistently
     async function handleApiResponse(response) {
@@ -245,6 +252,12 @@
         clearStorageBtn.disabled = false;
       }
     }
+    
+    // Initialize the page
+    document.addEventListener('DOMContentLoaded', () => {
+      // Update the title to show we're connected
+      document.title = "API Tester - " + window.location.hostname;
+    });
     
     // Event listeners
     runTestsBtn.addEventListener('click', (e) => {
