@@ -3,6 +3,14 @@ import axios from 'axios';
 // Constants
 const API_TIMEOUT = 15000; // 15 seconds
 
+// Helper function to get cookie by name
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
+
 // Helper function to create a cancellable request
 const createCancellableRequest = () => {
   const source = axios.CancelToken.source();
@@ -80,16 +88,19 @@ const api = axios.create({
     'Accept': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
-    'Expires': '0'
+    'Expires': '0',
+    'X-Requested-With': 'XMLHttpRequest'
   },
   withCredentials: true,
   timeout: API_TIMEOUT,
   xsrfCookieName: 'XSRF-TOKEN',
   xsrfHeaderName: 'X-XSRF-TOKEN',
   validateStatus: function (status) {
-    // Resolve only if the status code is less than 500
+    // Resolve for all status codes less than 500
     return status < 500;
-  }
+  },
+  // Enable cross-site cookie handling
+  withXSRFToken: true
 });
 
 // Debug log API configuration
@@ -115,10 +126,22 @@ api.interceptors.request.use(
       source
     };
 
+    // Add CORS headers for all requests
+    config.headers['Access-Control-Allow-Origin'] = window.location.origin;
+    config.headers['Access-Control-Allow-Credentials'] = 'true';
+
     // Check if this is an auth or health check endpoint
     const isAuthEndpoint = config.url.includes('/auth/') || 
                          config.url.endsWith('/auth') ||
                          config.url.includes('/health');
+                         
+    // Add CSRF token for non-GET requests
+    if (config.method !== 'get' && config.method !== 'head' && config.method !== 'options') {
+      const csrfToken = getCookie('XSRF-TOKEN');
+      if (csrfToken) {
+        config.headers['X-XSRF-TOKEN'] = csrfToken;
+      }
+    }
     
     // Get token from localStorage
     const token = localStorage.getItem('token');
