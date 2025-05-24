@@ -136,18 +136,6 @@ function App() {
                       } 
                     />
                     
-                    {/* Admin routes */}
-                    <Route 
-                      path="/admin/*" 
-                      element={
-                        <PrivateRoute adminOnly>
-                          <AppLayout>
-                            <AdminDashboard />
-                          </AppLayout>
-                        </PrivateRoute>
-                      } 
-                    />
-                    
                     {/* Test API route - for development only */}
                     <Route 
                       path="/test-api" 

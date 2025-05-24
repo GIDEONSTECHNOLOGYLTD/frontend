@@ -531,6 +531,15 @@ const settings = {
   sendTestEmail: async (email) => {
     const response = await api.post('/admin/settings/email/test', { email });
     return response.data;
+  },
+
+  /**
+   * Test email connection with current settings
+   * @returns {Promise<Object>} Test connection result
+   */
+  testEmailConnection: async () => {
+    const response = await api.post('/admin/settings/email/test-connection');
+    return response.data;
   }
 };
 
