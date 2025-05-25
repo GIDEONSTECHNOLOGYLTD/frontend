@@ -49,7 +49,7 @@ root.render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
-        <ErrorBoundary fallback={<div>Error loading WebSocket. Please refresh the page.</div>}>
+        <ErrorBoundary fallback={<div>Error loading application. Please refresh the page.</div>}>
           <WebSocketProvider>
             <SearchProvider>
               <App />

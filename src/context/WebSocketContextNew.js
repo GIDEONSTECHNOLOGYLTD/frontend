@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { AUTH_TOKEN } from '../config';
 
-// Create a more robust WebSocket context
-const WebSocketContext = createContext({
+// Default WebSocket context value
+const defaultContextValue = {
   socket: null,
   isConnected: false,
   sendMessage: () => {
@@ -10,7 +10,10 @@ const WebSocketContext = createContext({
       console.warn('WebSocket sendMessage called before initialization');
     }
   },
-});
+};
+
+// Create WebSocket context with default value
+const WebSocketContext = createContext(defaultContextValue);
 
 // Custom hook to safely access the WebSocket context
 export const useWebSocket = () => {
@@ -183,16 +186,22 @@ export const WebSocketProvider = ({ children }) => {
   }, [currentToken]);
 
   // Memoize context value to prevent unnecessary re-renders
-  const contextValue = React.useMemo(
+  const contextValue = useMemo(
     () => ({
       socket: ws.current,
       isConnected,
-      sendMessage,
-      // Add connection status for debugging
+      sendMessage: sendMessage || (() => {}), // Ensure sendMessage is always a function
       connectionStatus: isConnected ? 'connected' : 'disconnected'
     }),
     [isConnected, sendMessage]
   );
+
+  // Ensure we have a valid context value
+  if (!contextValue.sendMessage) {
+    contextValue.sendMessage = () => {
+      console.warn('WebSocket not ready');
+    };
+  }
 
   return (
     <WebSocketContext.Provider value={contextValue}>
