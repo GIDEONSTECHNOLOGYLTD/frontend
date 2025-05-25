@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { AUTH_TOKEN } from '../config';
+import { AUTH_TOKEN, API_URL } from '../config';
 
 // Default WebSocket context value
 const defaultContextValue = {
@@ -75,9 +75,18 @@ export const WebSocketProvider = ({ children }) => {
         }
       }
 
-      // Create new WebSocket connection
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      // Explicitly construct WebSocket URL for production
+      let wsUrl;
+      if (process.env.NODE_ENV === 'production') {
+        // In production, use the backend URL directly
+        wsUrl = 'wss://gideons-tech-suite.onrender.com/ws';
+      } else {
+        // In development, construct from API_URL
+        const apiUrl = new URL(API_URL);
+        const protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsPath = apiUrl.pathname.replace(/\/api\/v1$/, '');
+        wsUrl = `${protocol}//${apiUrl.host}${wsPath}/ws`;
+      }
       
       const newSocket = new WebSocket(wsUrl);
       ws.current = newSocket;
