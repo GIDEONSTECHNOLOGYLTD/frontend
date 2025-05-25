@@ -88,7 +88,8 @@ export const WebSocketProvider = ({ children }) => {
         wsUrl = `${protocol}//${apiUrl.host}${wsPath}/ws`;
       }
       
-      const newSocket = new WebSocket(wsUrl);
+      // Create WebSocket with authentication token in the protocol
+      const newSocket = new WebSocket(wsUrl, [token]);
       ws.current = newSocket;
 
       newSocket.onopen = () => {
