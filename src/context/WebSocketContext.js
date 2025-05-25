@@ -56,9 +56,13 @@ export const WebSocketProvider = ({ children }) => {
     }
 
     try {
-      // Use wss:// for production, ws:// for development
-      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-      const wsUrl = `${protocol}${new URL(API_URL).host}/ws`;
+      // Construct WebSocket URL based on API_URL
+      const apiUrl = new URL(API_URL);
+      // Use wss:// if API is https://, otherwise ws://
+      const protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Remove /api/v1 from pathname for WebSocket endpoint
+      const wsPath = apiUrl.pathname.replace(/\/api\/v1$/, '');
+      const wsUrl = `${protocol}//${apiUrl.host}${wsPath}/ws`;
       
       console.log(`Connecting to WebSocket at ${wsUrl}`);
       const newSocket = new WebSocket(wsUrl);
