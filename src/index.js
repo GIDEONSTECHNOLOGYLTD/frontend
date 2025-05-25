@@ -1,9 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AuthProvider } from './context/auth/AuthContext';
-import { WebSocketProvider } from './context/WebSocketContext';
+import { WebSocketProvider } from './context/WebSocketContextNew';
 import { SearchProvider } from './context/SearchContext';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import CssBaseline from '@mui/material/CssBaseline';
 import './index.css';
 import App from './App';
@@ -48,11 +49,13 @@ root.render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
-        <WebSocketProvider>
-          <SearchProvider>
-            <App />
-          </SearchProvider>
-        </WebSocketProvider>
+        <ErrorBoundary fallback={<div>Error loading WebSocket. Please refresh the page.</div>}>
+          <WebSocketProvider>
+            <SearchProvider>
+              <App />
+            </SearchProvider>
+          </WebSocketProvider>
+        </ErrorBoundary>
       </AuthProvider>
     </ThemeProvider>
   </React.StrictMode>
