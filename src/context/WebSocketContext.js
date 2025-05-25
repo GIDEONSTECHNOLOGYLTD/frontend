@@ -1,42 +1,29 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useAuth } from './auth/AuthContext';
 import { AUTH_TOKEN, API_URL } from '../config';
 
-// Safe auth hook with proper error handling
-const useSafeAuth = () => {
-  try {
-    const auth = useAuth?.() || {};
-    const safeUser = auth?.user || null;
-    const token = localStorage.getItem(AUTH_TOKEN);
-    
-    return {
-      user: safeUser,
-      loading: !!auth?.loading,
-      isAuthenticated: !!(safeUser && token),
-      token: token
-    };
-  } catch (error) {
-    console.warn('Error in useSafeAuth:', error);
-    return { 
-      user: null, 
-      loading: false, 
-      isAuthenticated: false,
-      token: null
-    };
-  }
-};
-
-// Define initial context value as a separate constant
-const initialContextValue = {
+// Simple WebSocket context without complex dependencies
+const WebSocketContext = createContext({
   socket: null,
   connectionStatus: 'disconnected',
   sendMessage: () => {
-    console.warn('WebSocket sendMessage called before initialization');
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('WebSocket sendMessage called before initialization');
+    }
   },
   isConnected: false
-};
+});
 
-const WebSocketContext = createContext(initialContextValue);
+// Simple hook to safely get auth token
+const useAuthToken = () => {
+  try {
+    return localStorage.getItem(AUTH_TOKEN) || null;
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Error getting auth token:', error);
+    }
+    return null;
+  }
+};
 
 export const WebSocketProvider = ({ children }) => {
   // State and refs
@@ -48,9 +35,9 @@ export const WebSocketProvider = ({ children }) => {
   const isMountedRef = useRef(true);
   const messageQueueRef = useRef([]);
   
-  // Get auth state with safe defaults
-  const authState = useSafeAuth();
-  const { user, loading, isAuthenticated, token } = authState || {};
+  // Get auth token
+  const token = useAuthToken();
+  const isAuthenticated = !!token;
   
   // Handle WebSocket connection
   const connectWebSocket = useCallback(() => {
@@ -145,19 +132,45 @@ export const WebSocketProvider = ({ children }) => {
 
   // Connect on mount and when auth state changes
   useEffect(() => {
-    if (isAuthenticated && token && isMountedRef.current) {
-      const ws = connectWebSocket();
-      return () => {
-        if (ws && ws.close) {
-          try {
-            ws.close();
-          } catch (error) {
+    if (!isMountedRef.current) return;
+    
+    let ws = null;
+    
+    const connect = () => {
+      if (isAuthenticated && token) {
+        ws = connectWebSocket();
+      }
+    };
+    
+    // Initial connection
+    connect();
+    
+    // Cleanup function
+    return () => {
+      isMountedRef.current = false;
+      
+      // Clear any pending reconnection attempts
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      // Close WebSocket if it exists
+      if (ws) {
+        try {
+          if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+            ws.close(1000, 'Component unmounting');
+          }
+        } catch (error) {
+          if (process.env.NODE_ENV !== 'production') {
             console.error('Error closing WebSocket:', error);
           }
         }
-      };
-    }
-    return () => {}; // No-op cleanup if not authenticated
+      }
+      
+      // Clear message queue
+      messageQueueRef.current = [];
+    };
   }, [isAuthenticated, token, connectWebSocket]);
 
   // Send message through WebSocket
@@ -178,43 +191,14 @@ export const WebSocketProvider = ({ children }) => {
   // Debug logging
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('WebSocketProvider - Auth state:', { 
-        hasUser: !!user, 
-        loading, 
+      console.log('WebSocketProvider - Connection state:', { 
+        connectionStatus,
         isAuthenticated,
         hasToken: !!token
       });
     }
-  }, [user, loading, isAuthenticated, token]);
+  }, [connectionStatus, isAuthenticated, token]);
   
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-      
-      // Clear any pending reconnection attempts
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      
-      // Close WebSocket connection if it exists
-      if (socket) {
-        try {
-          if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-            socket.close(1000, 'Component unmounting');
-          }
-        } catch (error) {
-          console.error('Error closing WebSocket on unmount:', error);
-        }
-        setSocket(null);
-      }
-      
-      // Clear message queue
-      messageQueueRef.current = [];
-    };
-  }, [socket]);
-
   // Context value with memoization
   const contextValue = useMemo(() => ({
     socket,
@@ -222,6 +206,8 @@ export const WebSocketProvider = ({ children }) => {
     sendMessage,
     isConnected: connectionStatus === 'connected'
   }), [socket, connectionStatus, sendMessage]);
+  
+  // No need for a separate cleanup effect since we handle cleanup in the connection effect
 
   return (
     <WebSocketContext.Provider value={contextValue}>
