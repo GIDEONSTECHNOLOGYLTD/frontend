@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/auth/AuthContext';
-import { TextField, Button, Container, Typography, Box, Paper, Alert, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { TextField, Button, Container, Typography, Box, Paper, Alert } from '@mui/material';
 
 const Register = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    passwordConfirm: '',
-    role: 'user'
+    passwordConfirm: ''
   });
+  
   const [error, setError] = useState('');
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const { name, email, password, passwordConfirm, role } = formData;
+  const { name, email, password, passwordConfirm } = formData;
 
   const onChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,7 +30,8 @@ const Register = () => {
       return;
     }
     
-    const result = await register({ name, email, password, role });
+    // Only send name, email, and password to the backend
+    const result = await register({ name, email, password });
     
     if (result.success) {
       navigate('/dashboard');
@@ -84,20 +85,7 @@ const Register = () => {
               value={email}
               onChange={onChange}
             />
-            <FormControl fullWidth margin="normal">
-              <InputLabel id="role-label">Role</InputLabel>
-              <Select
-                labelId="role-label"
-                id="role"
-                name="role"
-                value={role}
-                label="Role"
-                onChange={onChange}
-              >
-                <MenuItem value="user">User</MenuItem>
-                <MenuItem value="admin">Admin</MenuItem>
-              </Select>
-            </FormControl>
+            {/* Role selection removed as it's set by the backend */}
             <TextField
               margin="normal"
               required
