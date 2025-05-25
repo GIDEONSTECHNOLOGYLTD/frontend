@@ -1,16 +1,60 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { AuthProvider } from './context/auth/AuthContext';
+import { WebSocketProvider } from './context/WebSocketContext';
+import { SearchProvider } from './context/SearchContext';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+
+// Create theme
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2',
+    },
+    secondary: {
+      main: '#dc004e',
+    },
+    background: {
+      default: '#f5f5f5',
+    },
+  },
+  typography: {
+    fontFamily: [
+      '-apple-system',
+      'BlinkMacSystemFont',
+      '"Segoe UI"',
+      'Roboto',
+      '"Helvetica Neue"',
+      'Arial',
+      'sans-serif',
+      '"Apple Color Emoji"',
+      '"Segoe UI Emoji"',
+      '"Segoe UI Symbol"',
+    ].join(','),
+  },
+});
 
 console.log('Environment:', process.env.NODE_ENV);
 console.log('API URL:', process.env.REACT_APP_API_URL);
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+
 root.render(
   <React.StrictMode>
-    <App />
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AuthProvider>
+        <WebSocketProvider>
+          <SearchProvider>
+            <App />
+          </SearchProvider>
+        </WebSocketProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
 
