@@ -26,12 +26,17 @@ const useSafeAuth = () => {
   }
 };
 
-const WebSocketContext = createContext({
+// Define initial context value as a separate constant
+const initialContextValue = {
   socket: null,
   connectionStatus: 'disconnected',
-  sendMessage: () => {},
+  sendMessage: () => {
+    console.warn('WebSocket sendMessage called before initialization');
+  },
   isConnected: false
-});
+};
+
+const WebSocketContext = createContext(initialContextValue);
 
 export const WebSocketProvider = ({ children }) => {
   // State and refs
@@ -140,14 +145,19 @@ export const WebSocketProvider = ({ children }) => {
 
   // Connect on mount and when auth state changes
   useEffect(() => {
-    if (isAuthenticated && token) {
+    if (isAuthenticated && token && isMountedRef.current) {
       const ws = connectWebSocket();
       return () => {
-        if (ws) {
-          ws.close();
+        if (ws && ws.close) {
+          try {
+            ws.close();
+          } catch (error) {
+            console.error('Error closing WebSocket:', error);
+          }
         }
       };
     }
+    return () => {}; // No-op cleanup if not authenticated
   }, [isAuthenticated, token, connectWebSocket]);
 
   // Send message through WebSocket
@@ -181,12 +191,27 @@ export const WebSocketProvider = ({ children }) => {
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
-      if (socket) {
-        socket.close();
-      }
+      
+      // Clear any pending reconnection attempts
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
+      
+      // Close WebSocket connection if it exists
+      if (socket) {
+        try {
+          if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+            socket.close(1000, 'Component unmounting');
+          }
+        } catch (error) {
+          console.error('Error closing WebSocket on unmount:', error);
+        }
+        setSocket(null);
+      }
+      
+      // Clear message queue
+      messageQueueRef.current = [];
     };
   }, [socket]);
 
