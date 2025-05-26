@@ -5,10 +5,12 @@ import { AUTH_TOKEN, API_URL } from '../config';
 const defaultContextValue = {
   socket: null,
   isConnected: false,
-  sendMessage: () => {
+  connectionStatus: 'disconnected',
+  sendMessage: (message) => {
     if (process.env.NODE_ENV !== 'production') {
-      console.warn('WebSocket sendMessage called before initialization');
+      console.warn('WebSocket sendMessage called before initialization', message);
     }
+    return Promise.reject('WebSocket not initialized');
   },
 };
 
@@ -196,22 +198,27 @@ export const WebSocketProvider = ({ children }) => {
   }, [currentToken]);
 
   // Memoize context value to prevent unnecessary re-renders
-  const contextValue = useMemo(
-    () => ({
+  const contextValue = useMemo(() => {
+    const safeSendMessage = (message) => {
+      try {
+        if (typeof sendMessage === 'function') {
+          return sendMessage(message);
+        }
+        console.warn('WebSocket sendMessage not available', message);
+        return Promise.reject('WebSocket not ready');
+      } catch (error) {
+        console.error('Error in safeSendMessage:', error);
+        return Promise.reject(error);
+      }
+    };
+
+    return {
       socket: ws.current,
       isConnected,
-      sendMessage: sendMessage || (() => {}), // Ensure sendMessage is always a function
+      sendMessage: safeSendMessage,
       connectionStatus: isConnected ? 'connected' : 'disconnected'
-    }),
-    [isConnected, sendMessage]
-  );
-
-  // Ensure we have a valid context value
-  if (!contextValue.sendMessage) {
-    contextValue.sendMessage = () => {
-      console.warn('WebSocket not ready');
     };
-  }
+  }, [isConnected, sendMessage]);
 
   return (
     <WebSocketContext.Provider value={contextValue}>
