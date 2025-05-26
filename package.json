@@ -2,13 +2,7 @@
   "name": "frontend",
   "version": "0.1.0",
   "homepage": ".",
-  "proxy": {
-    "/api": {
-      "target": "https://gideons-tech-suite.onrender.com",
-      "changeOrigin": true,
-      "secure": true
-    }
-  },
+  "proxy": "https://gideons-tech-suite.onrender.com",
   "private": true,
   "resolutions": {
     "ajv": "6.12.6",

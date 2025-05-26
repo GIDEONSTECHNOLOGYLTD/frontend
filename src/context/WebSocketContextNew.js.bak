@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { AUTH_TOKEN, API_URL } from '../config';
 
 // Connection status types
@@ -55,9 +55,7 @@ export const useWebSocket = () => {
 
 export const WebSocketProvider = ({ children }) => {
   const [connectionStatus, setConnectionStatus] = useState(CONNECTION_STATUS.DISCONNECTED);
-  // isAuthenticated is kept for backward compatibility but not used internally
-  // as we rely on connectionStatus for authentication state
-  const [, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [connectionId, setConnectionId] = useState(null);
   const [userId, setUserId] = useState(null);
   
@@ -70,7 +68,7 @@ export const WebSocketProvider = ({ children }) => {
   const messageHandlers = useRef(new Map());
   const ws = useRef(null);
   const latestToken = useRef(null);
-  // Removed unused pendingAuth ref as it's not being used
+  const pendingAuth = useRef(null);
   const lastActivity = useRef(Date.now());
 
   // Get the authentication token
@@ -205,47 +203,6 @@ export const WebSocketProvider = ({ children }) => {
             });
           }
       }
-    } catch (error) {
-      console.error('Error processing WebSocket message:', error, event.data);
-    }
-  }, [processMessageQueue]);
-
-  // Attempt to reconnect with exponential backoff
-  const attemptReconnect = useCallback(() => {
-    if (!isMounted.current || !getToken()) {
-      return;
-    }
-    
-    if (reconnectAttempts.current < CONFIG.MAX_RECONNECT_ATTEMPTS) {
-      const baseDelay = Math.min(
-        CONFIG.RECONNECT_DELAY * Math.pow(2, reconnectAttempts.current),
-        CONFIG.MAX_RECONNECT_DELAY
-      );
-      const jitter = Math.random() * 1000; // Add jitter to prevent thundering herd
-      const delay = Math.floor(baseDelay + jitter);
-      
-      reconnectAttempts.current += 1;
-      setConnectionStatus(CONNECTION_STATUS.RECONNECTING);
-      
-      console.log(`Reconnecting in ${Math.round(delay / 1000)}s... (attempt ${reconnectAttempts.current})`);
-      
-      reconnectTimeout.current = setTimeout(() => {
-        if (isMounted.current && connectRef.current) {
-          connectRef.current();
-        }
-      }, delay);
-    } else {
-      console.error('Max reconnection attempts reached');
-      setConnectionStatus(CONNECTION_STATUS.ERROR);
-    }
-  }, [getToken]);
-
-  // Handle WebSocket close events
-  const handleClose = useCallback((event) => {
-    if (!isMounted.current) return;
-    
-    const { code, reason, wasClean } = event;
-    console.log(`WebSocket closed: ${code} ${reason}`, { wasClean });
     
     // Clean up connection
     cleanupConnection();
@@ -267,11 +224,38 @@ export const WebSocketProvider = ({ children }) => {
       // Other errors - attempt to reconnect
       attemptReconnect();
     }
-  }, [cleanupConnection, setConnectionStatus, setIsAuthenticated, setConnectionId, setUserId, attemptReconnect]);
+  }, [cleanupConnection, setConnectionStatus, setIsAuthenticated, setConnectionId, setUserId]);
 
-  // Store the latest connect function in a ref to avoid circular dependencies
-  const connectRef = useRef(null);
-  
+  // Attempt to reconnect with exponential backoff
+  const attemptReconnect = useCallback(() => {
+    if (!isMounted.current || !getToken()) {
+      return;
+    }
+    
+    if (reconnectAttempts.current < CONFIG.MAX_RECONNECT_ATTEMPTS) {
+      const baseDelay = Math.min(
+        CONFIG.RECONNECT_DELAY * Math.pow(2, reconnectAttempts.current),
+        CONFIG.MAX_RECONNECT_DELAY
+      );
+      const jitter = Math.random() * 1000; // Add jitter to prevent thundering herd
+      const delay = Math.floor(baseDelay + jitter);
+      
+      reconnectAttempts.current += 1;
+      setConnectionStatus(CONNECTION_STATUS.RECONNECTING);
+      
+      console.log(`Reconnecting in ${Math.round(delay / 1000)}s... (attempt ${reconnectAttempts.current})`);
+      
+      reconnectTimeout.current = setTimeout(() => {
+        if (isMounted.current) {
+          connect();
+        }
+      }, delay);
+    } else {
+      console.error('Max reconnection attempts reached');
+      setConnectionStatus(CONNECTION_STATUS.ERROR);
+    }
+  }, [connect, getToken, isMounted, setConnectionStatus]);
+
   // Initialize WebSocket connection
   const connect = useCallback(async () => {
     if (!isMounted.current) return;
@@ -390,7 +374,6 @@ export const WebSocketProvider = ({ children }) => {
         if (messageQueue.current.length < CONFIG.MAX_QUEUE_SIZE) {
           messageQueue.current.push(message);
           console.log('WebSocket not connected, message queued');
-          resolve();
         } else {
           console.error('Message queue full, dropping message');
           reject('Message queue full');
@@ -432,9 +415,6 @@ export const WebSocketProvider = ({ children }) => {
   useEffect(() => {
     isMounted.current = true;
     
-    // Initialize connectRef with the latest connect function
-    connectRef.current = connect;
-    
     // Initial connection if we have a token
     const token = getToken();
     if (token) {
@@ -462,22 +442,9 @@ export const WebSocketProvider = ({ children }) => {
       }
       
       messageQueue.current = [];
-      
-      // Store a reference to the current handlers map
-      const currentHandlers = messageHandlers.current;
-      // Clear the ref
-      messageHandlers.current = new Map();
-      // Clear all handlers from the stored reference
-      currentHandlers.clear();
+      messageHandlers.current.clear();
     };
   }, [connect, getToken, cleanupConnection]);
-  
-  // Update connectRef whenever connect changes
-  useEffect(() => {
-    if (connect) {
-      connectRef.current = connect;
-    }
-  }, [connect]);
 
   // Reconnect when token changes
   useEffect(() => {
@@ -485,15 +452,6 @@ export const WebSocketProvider = ({ children }) => {
       connect();
     }
   }, [getToken, connect]);
-
-  // Clean up WebSocket connection
-  const disconnect = useCallback(() => {
-    if (ws.current) {
-      console.log('Disconnecting WebSocket...');
-      ws.current.close(1000, 'User disconnected');
-    }
-    cleanupConnection();
-  }, [cleanupConnection]);
 
   // Context value
   const contextValue = useMemo(() => ({
@@ -506,18 +464,14 @@ export const WebSocketProvider = ({ children }) => {
     userId,
     sendMessage,
     onMessage,
-    authenticate,
-    connect,
-    disconnect
+    authenticate
   }), [
     connectionStatus, 
     connectionId, 
     userId, 
     sendMessage, 
     onMessage, 
-    authenticate,
-    connect,
-    disconnect
+    authenticate
   ]);
 
   return (

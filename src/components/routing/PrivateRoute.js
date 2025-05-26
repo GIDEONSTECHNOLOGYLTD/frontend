@@ -16,7 +16,7 @@ import {
  * @returns {JSX.Element} - The rendered component
  */
 const PrivateRoute = ({ adminOnly = false, children = <Outlet /> }) => {
-  const { isAuthenticated, isLoading, isAdmin } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
   const theme = useTheme();
 
@@ -43,12 +43,12 @@ const PrivateRoute = ({ adminOnly = false, children = <Outlet /> }) => {
   }
 
   // If not authenticated, redirect to login
-  if (!isAuthenticated()) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // If adminOnly is true and user is not an admin, show access denied
-  if (adminOnly && !isAdmin()) {
+  if (adminOnly && !(user?.role === 'admin')) {
     return (
       <Box 
         display="flex" 

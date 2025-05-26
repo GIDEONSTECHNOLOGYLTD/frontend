@@ -11,6 +11,8 @@ import DocumentRoutes from './routes/DocumentRoutes';
 import SearchPage from './pages/SearchPage';
 import { AdminDashboard, AuditLogs, Settings } from './pages/admin';
 import TestApi from './components/TestApi';
+import WebSocketStatus from './components/WebSocketStatus';
+import WebSocketTestPage from './pages/WebSocketTestPage';
 
 // Main app layout with navigation
 const AppLayout = ({ children }) => (
@@ -35,6 +37,26 @@ function App() {
               element={
                 <AppLayout>
                   <Dashboard />
+                </AppLayout>
+              } 
+            />
+            
+            {/* WebSocket Status - for debugging */}
+            <Route 
+              path="/ws-status" 
+              element={
+                <AppLayout>
+                  <WebSocketStatus />
+                </AppLayout>
+              } 
+            />
+            
+            {/* WebSocket Test Page */}
+            <Route 
+              path="/ws-test" 
+              element={
+                <AppLayout>
+                  <WebSocketTestPage />
                 </AppLayout>
               } 
             />

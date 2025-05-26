@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AuthProvider } from './context/auth/AuthContext';
-import { WebSocketProvider } from './context/WebSocketContextNew';
+import { WebSocketProvider } from './context/WebSocketContext';
 import { SearchProvider } from './context/SearchContext';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import ErrorBoundary from './components/common/ErrorBoundary';

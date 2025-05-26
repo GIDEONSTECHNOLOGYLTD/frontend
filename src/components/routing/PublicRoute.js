@@ -31,7 +31,7 @@ const PublicRoute = ({
   }
 
   // If authenticated, redirect to the specified route or home
-  if (isAuthenticated()) {
+  if (isAuthenticated) {
     return <Navigate to={redirectTo} replace />;
   }
 
