@@ -3,11 +3,6 @@
   "builds": [
     { "src": "package.json", "use": "@vercel/static-build" }
   ],
-  "routes": [
-    { "src": "/static/(.*)", "dest": "/static/$1" },
-    { "src": "/(.*\\.(js|css|json|png|jpg|jpeg|gif|ico|svg))", "dest": "/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ],
   "rewrites": [
     { 
       "source": "/ws", 
@@ -16,6 +11,10 @@
     { 
       "source": "/api/(.*)", 
       "destination": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api/$1" 
+    },
+    { 
+      "source": "/(.*)", 
+      "destination": "/index.html" 
     }
   ],
   "headers": [
