@@ -1,9 +1,13 @@
 {
   "version": 2,
   "builds": [
-    { 
-      "src": "package.json", 
+    {
+      "src": "package.json",
       "use": "@vercel/static-build"
+    },
+    {
+      "src": "api/manifest.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -27,10 +31,7 @@
     },
     {
       "src": "/manifest.json",
-      "dest": "/manifest.json",
-      "headers": {
-        "cache-control": "public, max-age=0, must-revalidate"
-      }
+      "dest": "/api/manifest"
     },
     {
       "src": "/asset-manifest.json",
