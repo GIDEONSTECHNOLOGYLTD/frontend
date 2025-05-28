@@ -41,15 +41,10 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "GENERATE_SOURCEMAP=false PUBLIC_URL=. react-scripts build",
-    "test": "react-scripts test --watchAll=false",
-    "test:watch": "react-scripts test",
-    "test:coverage": "react-scripts test --coverage --watchAll=false",
-    "test:integration": "jest --config=jest.integration.config.js",
-    "test:cross-browser": "node scripts/run-cross-browser-tests.js",
-    "test:update": "react-scripts test --updateSnapshot",
+    "test": "react-scripts test",
     "eject": "react-scripts eject",
     "lint": "eslint src --ext .js,.jsx",
-    "lint:fix": "eslint src --ext .js,.jsx --fix",
+    "vercel-build": "npm run build",
     "format": "prettier --write \"src/**/*.{js,jsx,json,md}\""
   },
   "eslintConfig": {
