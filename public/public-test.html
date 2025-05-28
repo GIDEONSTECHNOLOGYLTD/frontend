@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gideon's Tech Suite - Public API Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      color: #2c3e50;
+    }
+    .card {
+      background: #f9f9f9;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    pre {
+      background: #f1f1f1;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .success { color: #27ae60; }
+    .error { color: #e74c3c; }
+    .info { color: #3498db; }
+    #log {
+      max-height: 300px;
+      overflow-y: auto;
+      background: #f8f8f8;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gideon's Tech Suite - Public API Test</h1>
+  <p>This page tests the public API endpoint that doesn't require authentication.</p>
+  
+  <div class="card">
+    <h2>Backend URL</h2>
+    <p><strong>API URL:</strong> <span id="api-url">https://backend-80jnpluh6-gideonstechnologyltds-projects.vercel.app/api</span></p>
+    <button onclick="changeBackendUrl()">Change Backend URL</button>
+  </div>
+  
+  <div class="card">
+    <h2>Public API Test</h2>
+    <button onclick="testPublicEndpoint()">Test Public Endpoint</button>
+    <button onclick="testAllEndpoints()">Test All Endpoints</button>
+  </div>
+  
+  <div class="card">
+    <h2>Results</h2>
+    <div id="results">No tests run yet.</div>
+  </div>
+  
+  <div class="card">
+    <h2>Log</h2>
+    <div id="log"></div>
+    <button onclick="clearLog()" style="margin-top: 10px;">Clear Log</button>
+  </div>
+  
+  <div class="card">
+    <h2>Document Sharing Features</h2>
+    <p>This application includes the following document sharing features:</p>
+    <ul>
+      <li>Document sharing with different permission levels (view, edit, manage)</li>
+      <li>Version control with history tracking</li>
+      <li>Real-time updates via WebSocket</li>
+      <li>Secure authorization checks</li>
+    </ul>
+    <p>These features are implemented in the main application.</p>
+  </div>
+  
+  <script>
+    // Configuration
+    let apiUrl = 'https://backend-80jnpluh6-gideonstechnologyltds-projects.vercel.app/api';
+    
+    // DOM Elements
+    const resultsDiv = document.getElementById('results');
+    const logDiv = document.getElementById('log');
+    const apiUrlSpan = document.getElementById('api-url');
+    
+    // Logging function
+    function log(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = type;
+      entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(`[${type}] ${message}`);
+    }
+    
+    // Clear log
+    function clearLog() {
+      logDiv.innerHTML = '';
+      log('Log cleared');
+    }
+    
+    // Change backend URL
+    function changeBackendUrl() {
+      const newApiUrl = prompt('Enter new API URL:', apiUrl);
+      if (newApiUrl) {
+        apiUrl = newApiUrl;
+        apiUrlSpan.textContent = apiUrl;
+        log(`API URL updated: ${apiUrl}`, 'info');
+      }
+    }
+    
+    // Test public endpoint
+    async function testPublicEndpoint() {
+      log('Testing public endpoint...');
+      resultsDiv.innerHTML = '<p>Testing public endpoint...</p>';
+      
+      try {
+        const response = await fetch(`${apiUrl}/public-test`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          log('Public endpoint test successful', 'success');
+          resultsDiv.innerHTML = `
+            <h3 class="success">Public Endpoint: Success</h3>
+            <p>Status: ${response.status}</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+          return { success: true, data };
+        } else {
+          throw new Error(`HTTP Error: ${response.status}`);
+        }
+      } catch (error) {
+        log(`Public endpoint test failed: ${error.message}`, 'error');
+        resultsDiv.innerHTML = `
+          <h3 class="error">Public Endpoint: Failed</h3>
+          <p>Error: ${error.message}</p>
+        `;
+        return { success: false, error: error.message };
+      }
+    }
+    
+    // Test all endpoints
+    async function testAllEndpoints() {
+      log('Testing all API endpoints...');
+      resultsDiv.innerHTML = '<p>Testing all API endpoints...</p>';
+      
+      const endpoints = [
+        { name: 'Public Test', path: '/public-test' },
+        { name: 'Health', path: '/health' },
+        { name: 'Status', path: '/status' },
+        { name: 'Root API', path: '' }
+      ];
+      
+      const results = {};
+      
+      for (const endpoint of endpoints) {
+        log(`Testing ${endpoint.name} endpoint...`);
+        
+        try {
+          const response = await fetch(`${apiUrl}${endpoint.path}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            log(`${endpoint.name} endpoint test successful`, 'success');
+            results[endpoint.name] = { success: true, status: response.status, data };
+          } else {
+            throw new Error(`HTTP Error: ${response.status}`);
+          }
+        } catch (error) {
+          log(`${endpoint.name} endpoint test failed: ${error.message}`, 'error');
+          results[endpoint.name] = { success: false, error: error.message };
+        }
+      }
+      
+      const allSuccess = Object.values(results).every(r => r.success);
+      
+      let resultsHtml = `
+        <h3 class="${allSuccess ? 'success' : 'error'}">All Endpoints Test: ${allSuccess ? 'Success' : 'Some Failed'}</h3>
+      `;
+      
+      for (const [endpoint, result] of Object.entries(results)) {
+        resultsHtml += `
+          <div class="card">
+            <h4>${endpoint} Endpoint: ${result.success ? 'Success' : 'Failed'}</h4>
+            ${result.success 
+              ? `<pre>${JSON.stringify(result.data, null, 2)}</pre>` 
+              : `<p class="error">Error: ${result.error}</p>`}
+          </div>
+        `;
+      }
+      
+      resultsDiv.innerHTML = resultsHtml;
+      log(`All endpoints test completed: ${allSuccess ? 'All successful' : 'Some failed'}`, allSuccess ? 'success' : 'error');
+    }
+    
+    // Initialize
+    log('Public API test page loaded', 'info');
+    log(`API URL: ${apiUrl}`, 'info');
+    
+    // Auto-run test on page load
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        testPublicEndpoint();
+      }, 1000);
+    });
+  </script>
+</body>
+</html>
