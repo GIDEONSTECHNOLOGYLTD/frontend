@@ -42,11 +42,11 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api/$1"
+      "dest": "https://gideons-tech-suite-api.vercel.app/api/$1"
     },
     {
       "src": "/ws",
-      "dest": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws"
+      "dest": "https://gideons-tech-suite-api.vercel.app/ws"
     },
     {
       "src": "/(.*)",
@@ -57,15 +57,15 @@
     }
   ],
   "env": {
-    "PUBLIC_URL": "/",
-    "REACT_APP_API_URL": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api",
-    "REACT_APP_WS_URL": "wss://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws"
+    "NODE_ENV": "production",
+    "PUBLIC_URL": "/"
   },
   "build": {
     "env": {
+      "NODE_ENV": "production",
       "PUBLIC_URL": "/",
-      "REACT_APP_API_URL": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api",
-      "REACT_APP_WS_URL": "wss://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws"
+      "REACT_APP_API_URL": "https://gideons-tech-suite-api.vercel.app/api",
+      "REACT_APP_WS_URL": "wss://gideons-tech-suite-api.vercel.app/ws"
     }
   }
 }
