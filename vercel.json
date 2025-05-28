@@ -5,16 +5,16 @@
   ],
   "rewrites": [
     { 
-      "source": "/ws", 
-      "destination": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws" 
+      "source": "/api/:path*",
+      "destination": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api/:path*"
     },
     { 
-      "source": "/api/(.*)", 
-      "destination": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api/$1" 
+      "source": "/ws",
+      "destination": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws"
     },
     { 
-      "source": "/(.*)", 
-      "destination": "/index.html" 
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
