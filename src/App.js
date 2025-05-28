@@ -1,6 +1,7 @@
-import React, { Component } from 'react';
+import React, { Component, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Box, Typography, Button } from '@mui/material';
+import axios from 'axios';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import Dashboard from './components/Dashboard';
@@ -13,6 +14,9 @@ import { AdminDashboard, AuditLogs, Settings } from './pages/admin';
 import TestApi from './components/TestApi';
 import WebSocketStatus from './components/WebSocketStatus';
 import WebSocketTestPage from './pages/WebSocketTestPage';
+import LoadingScreen from './components/common/LoadingScreen';
+import ApiConnectionTest from './components/ApiConnectionTest';
+import { API_URL } from './config';
 
 // Main app layout with navigation
 const AppLayout = ({ children }) => (
@@ -21,6 +25,46 @@ const AppLayout = ({ children }) => (
 
 // Main App component with routing
 function App() {
+  const [apiStatus, setApiStatus] = useState({
+    loading: true,
+    connected: false,
+    error: null
+  });
+
+  // Check API connection on component mount
+  useEffect(() => {
+    const checkApiConnection = async () => {
+      try {
+        // Try to connect to the API health endpoint
+        await axios.get(`${API_URL}/health`, { timeout: 5000 });
+        setApiStatus({
+          loading: false,
+          connected: true,
+          error: null
+        });
+      } catch (error) {
+        console.error('API connection error:', error);
+        setApiStatus({
+          loading: false,
+          connected: false,
+          error: error.message || 'Failed to connect to API'
+        });
+      }
+    };
+
+    checkApiConnection();
+  }, []);
+
+  // Show loading screen while checking API connection
+  if (apiStatus.loading) {
+    return <LoadingScreen message="Loading Gideon's Tech Suite..." />;
+  }
+
+  // Show API connection test if connection failed
+  if (!apiStatus.connected) {
+    return <ApiConnectionTest />;
+  }
+
   return (
     <Router>
       <div className="App">
@@ -127,6 +171,16 @@ function App() {
               element={
                 <AppLayout>
                   <TestApi />
+                </AppLayout>
+              } 
+            />
+            
+            {/* API Connection Test route */}
+            <Route 
+              path="/api-test" 
+              element={
+                <AppLayout>
+                  <ApiConnectionTest />
                 </AppLayout>
               } 
             />

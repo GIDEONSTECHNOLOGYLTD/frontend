@@ -2,6 +2,9 @@ import { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { API_URL, AUTH_TOKEN } from '../../config.js';
 
+// Configure axios defaults
+axios.defaults.timeout = 10000; // 10 seconds timeout
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
