@@ -5,11 +5,18 @@
   ],
   "routes": [
     { "src": "/static/(.*)", "dest": "/static/$1" },
-    { "src": "/(.*\\.(js|css|json|png|jpg|jpeg|gif|ico))", "dest": "/$1" },
+    { "src": "/(.*\\.(js|css|json|png|jpg|jpeg|gif|ico|svg))", "dest": "/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "rewrites": [
-    { "source": "/ws", "destination": "https://gideons-tech-suite.onrender.com/ws" }
+    { 
+      "source": "/ws", 
+      "destination": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws" 
+    },
+    { 
+      "source": "/api/(.*)", 
+      "destination": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api/$1" 
+    }
   ],
   "headers": [
     {
@@ -17,7 +24,10 @@
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT,WEBSOCKET" },
-        { "key": "Access-Control-Allow-Headers", "value": "X-Requested-With, Content-Type, Authorization, X-CSRF-Token, Accept, Accept-Version, Content-Length, Content-MD5, Date, X-Api-Version" }
+        { "key": "Access-Control-Allow-Headers", "value": "X-Requested-With, Content-Type, Authorization, X-CSRF-Token, Accept, Accept-Version, Content-Length, Content-MD5, Date, X-Api-Version" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
       ]
     }
   ]
