@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
-import { API_URL, AUTH_TOKEN } from '../../config.js';
+import { API_URL, FRONTEND_API_URL, AUTH_TOKEN } from '../../config.js';
 
 // Configure axios defaults
 axios.defaults.timeout = 10000; // 10 seconds timeout
@@ -20,14 +20,21 @@ export const AuthProvider = ({ children }) => {
   // Check API connectivity first, then load user
   const loadUser = async () => {
     try {
-      // First check if the API is accessible via the public test endpoint
+      // First check if the frontend API is accessible
       try {
-        console.log('Testing API connectivity with public endpoint...');
-        const testResponse = await axios.get(`${API_URL}/public-test`, {
+        console.log('Testing API connectivity with frontend health endpoint...');
+        const healthResponse = await axios.get(`${FRONTEND_API_URL}/health`, {
           timeout: 5000,
           headers: { 'Accept': 'application/json' }
         });
-        console.log('API connectivity test successful:', testResponse.data);
+        console.log('Frontend API health check successful:', healthResponse.data);
+        
+        // Then check database connectivity
+        const dbResponse = await axios.get(`${FRONTEND_API_URL}/db-status`, {
+          timeout: 8000,
+          headers: { 'Accept': 'application/json' }
+        });
+        console.log('Database connectivity check:', dbResponse.data);
       } catch (testError) {
         console.error('API connectivity test failed:', testError.message);
         // Continue anyway, but log the error

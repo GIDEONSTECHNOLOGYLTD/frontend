@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, CircularProgress, Typography, Button } from '@mui/material';
 import axios from 'axios';
-import { API_URL } from '../../config';
+import { FRONTEND_API_URL } from '../../config';
 
 /**
  * Enhanced loading screen with backend connectivity check
@@ -12,30 +12,43 @@ const LoadingScreen = ({ message = "Loading Gideon's Tech Suite..." }) => {
   const [error, setError] = useState('');
   const [attempts, setAttempts] = useState(0);
 
-  // Check backend connectivity
+  // Check API connectivity using the frontend API endpoints
   const checkBackendStatus = async () => {
     try {
       setStatus('loading');
       setError('');
       
-      // Try to connect to the backend public test endpoint (doesn't require auth)
-      await axios.get(`${API_URL}/public-test`, { 
+      // First check if the frontend API is accessible
+      console.log('Testing API connectivity with frontend health endpoint...');
+      const healthResponse = await axios.get(`${FRONTEND_API_URL}/health`, {
         timeout: 5000,
         headers: { 'Accept': 'application/json' }
       });
+      console.log('Frontend API health check successful:', healthResponse.data);
       
+      // Then check database connectivity
+      console.log('Testing database connectivity...');
+      const dbResponse = await axios.get(`${FRONTEND_API_URL}/db-status`, {
+        timeout: 8000,
+        headers: { 'Accept': 'application/json' }
+      });
+      console.log('Database connectivity check:', dbResponse.data);
+      
+      // If we get here, both checks passed
       setStatus('connected');
-      console.log('Successfully connected to backend API');
+      console.log('Successfully connected to API and database');
     } catch (err) {
-      console.error('Backend connection error:', err);
+      console.error('Connection error:', err);
       setStatus('error');
       
       if (err.code === 'ECONNABORTED') {
         setError('Connection timed out. The server may be temporarily unavailable.');
       } else if (!err.response) {
         setError('Cannot connect to the server. Please check your internet connection.');
+      } else if (err.response?.data?.error?.message) {
+        setError(`Error: ${err.response.data.error.message}`);
       } else {
-        setError(`Server error: ${err.response?.status || 'Unknown'} - ${err.response?.data?.message || ''}`);
+        setError(`Server error: ${err.response?.status || 'Unknown'} - ${err.response?.data?.message || 'Unknown error'}`);
       }
     }
   };
