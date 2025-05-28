@@ -18,13 +18,14 @@ const LoadingScreen = ({ message = "Loading Gideon's Tech Suite..." }) => {
       setStatus('loading');
       setError('');
       
-      // Try to connect to the backend health endpoint
-      await axios.get(`${API_URL}/health`, { 
+      // Try to connect to the backend public test endpoint (doesn't require auth)
+      await axios.get(`${API_URL}/public-test`, { 
         timeout: 5000,
         headers: { 'Accept': 'application/json' }
       });
       
       setStatus('connected');
+      console.log('Successfully connected to backend API');
     } catch (err) {
       console.error('Backend connection error:', err);
       setStatus('error');
@@ -34,7 +35,7 @@ const LoadingScreen = ({ message = "Loading Gideon's Tech Suite..." }) => {
       } else if (!err.response) {
         setError('Cannot connect to the server. Please check your internet connection.');
       } else {
-        setError(`Server error: ${err.response?.status || 'Unknown'}`);
+        setError(`Server error: ${err.response?.status || 'Unknown'} - ${err.response?.data?.message || ''}`);
       }
     }
   };

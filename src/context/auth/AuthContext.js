@@ -17,9 +17,22 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  // Load user from token
+  // Check API connectivity first, then load user
   const loadUser = async () => {
     try {
+      // First check if the API is accessible via the public test endpoint
+      try {
+        console.log('Testing API connectivity with public endpoint...');
+        const testResponse = await axios.get(`${API_URL}/public-test`, {
+          timeout: 5000,
+          headers: { 'Accept': 'application/json' }
+        });
+        console.log('API connectivity test successful:', testResponse.data);
+      } catch (testError) {
+        console.error('API connectivity test failed:', testError.message);
+        // Continue anyway, but log the error
+      }
+      
       const token = localStorage.getItem(AUTH_TOKEN);
       
       if (!token) {
@@ -34,7 +47,8 @@ export const AuthProvider = ({ children }) => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
-        }
+        },
+        timeout: 8000 // Add explicit timeout
       });
 
       console.log('User loaded successfully:', res.data.data);
@@ -46,8 +60,11 @@ export const AuthProvider = ({ children }) => {
         data: err.response?.data
       });
       
-      // Clear invalid token
-      localStorage.removeItem(AUTH_TOKEN);
+      // Clear invalid token only if it's an auth error (401/403)
+      if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+        console.log('Clearing invalid token due to auth error');
+        localStorage.removeItem(AUTH_TOKEN);
+      }
       setUser(null);
     } finally {
       setLoading(false);

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_URL, AUTH_TOKEN } from '../config';
 
 // Constants
 const API_TIMEOUT = 15000; // 15 seconds
@@ -80,9 +81,11 @@ const handleApiError = (error) => {
 // Export utility functions
 export { createCancellableRequest, handleApiError };
 
+// Use the API_URL and AUTH_TOKEN from config
+
 // Create axios instance with base URL
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://gideons-tech-suite-api.vercel.app/api',
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -91,10 +94,8 @@ const api = axios.create({
     'Expires': '0',
     'X-Requested-With': 'XMLHttpRequest'
   },
-  withCredentials: true,
+  withCredentials: false, // Changed to false since we're using token auth
   timeout: API_TIMEOUT,
-  xsrfCookieName: 'XSRF-TOKEN',
-  xsrfHeaderName: 'X-XSRF-TOKEN',
   validateStatus: function (status) {
     // Resolve for all status codes less than 500
     return status < 500;
@@ -124,29 +125,24 @@ api.interceptors.request.use(
       source
     };
 
-    // Add CORS headers for all requests
-    config.headers['Access-Control-Allow-Origin'] = window.location.origin;
-    config.headers['Access-Control-Allow-Credentials'] = 'true';
-
-    // Check if this is an auth or health check endpoint
-    const isAuthEndpoint = config.url.includes('/auth/') || 
-                         config.url.endsWith('/auth') ||
-                         config.url.includes('/health');
-                         
-    // Add CSRF token for non-GET requests
-    if (config.method !== 'get' && config.method !== 'head' && config.method !== 'options') {
-      const csrfToken = getCookie('XSRF-TOKEN');
-      if (csrfToken) {
-        config.headers['X-XSRF-TOKEN'] = csrfToken;
-      }
-    }
+    // Check if this is a public endpoint that doesn't require authentication
+    const isPublicEndpoint = 
+      config.url.includes('/public-test') || 
+      config.url.includes('/health') || 
+      config.url.includes('/status') || 
+      config.url.endsWith('/api') || 
+      config.url.includes('/auth/login') || 
+      config.url.includes('/auth/register');
     
-    // Get token from localStorage
-    const token = localStorage.getItem('token');
+    // Get token from localStorage using the AUTH_TOKEN key from config
+    const token = localStorage.getItem(AUTH_TOKEN);
     
-    // If token exists and it's not an auth endpoint, add it to the headers
-    if (token && !isAuthEndpoint) {
+    // If token exists and it's not a public endpoint, add it to the headers
+    if (token && !isPublicEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('Adding auth token to request:', config.url);
+    } else if (!isPublicEndpoint) {
+      console.warn('No auth token found for protected endpoint:', config.url);
     }
 
     // Add request ID for tracking if not already set
