@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gideon's Tech Suite - Connection Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      color: #2c3e50;
+    }
+    .card {
+      background: #f9f9f9;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    pre {
+      background: #f1f1f1;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .success { color: #27ae60; }
+    .error { color: #e74c3c; }
+    .info { color: #3498db; }
+    #log {
+      max-height: 300px;
+      overflow-y: auto;
+      background: #f8f8f8;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      font-family: monospace;
+    }
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-radius: 50%;
+      border-top: 3px solid #3498db;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <h1>Gideon's Tech Suite - Connection Test</h1>
+  <p>This page tests connectivity to various components of the application.</p>
+  
+  <div class="card">
+    <h2>Direct Backend Connection Test</h2>
+    <p>This bypasses the authentication by using a direct fetch with credentials.</p>
+    <button id="test-direct">Test Direct Connection</button>
+    <div id="direct-result" class="card" style="display: none;">
+      <h3>Results:</h3>
+      <pre id="direct-output">No test run yet.</pre>
+    </div>
+  </div>
+  
+  <div class="card">
+    <h2>Authentication Status</h2>
+    <p>Check if you have an active authentication token.</p>
+    <button id="check-auth">Check Authentication</button>
+    <div id="auth-result" class="card" style="display: none;">
+      <h3>Results:</h3>
+      <pre id="auth-output">No test run yet.</pre>
+    </div>
+  </div>
+  
+  <div class="card">
+    <h2>Login Test</h2>
+    <p>Test login functionality with demo credentials.</p>
+    <div>
+      <input type="email" id="email" placeholder="Email" value="demo@example.com">
+      <input type="password" id="password" placeholder="Password" value="demo123">
+      <button id="test-login">Test Login</button>
+    </div>
+    <div id="login-result" class="card" style="display: none;">
+      <h3>Results:</h3>
+      <pre id="login-output">No test run yet.</pre>
+    </div>
+  </div>
+  
+  <div class="card">
+    <h2>Log</h2>
+    <div id="log"></div>
+    <button onclick="clearLog()" style="margin-top: 10px;">Clear Log</button>
+  </div>
+  
+  <script>
+    // Configuration
+    const API_URL = 'https://backend-47gm9uvpe-gideonstechnologyltds-projects.vercel.app/api';
+    const AUTH_TOKEN_KEY = 'gts_token';
+    
+    // DOM Elements
+    const logDiv = document.getElementById('log');
+    const directTestBtn = document.getElementById('test-direct');
+    const directResult = document.getElementById('direct-result');
+    const directOutput = document.getElementById('direct-output');
+    const checkAuthBtn = document.getElementById('check-auth');
+    const authResult = document.getElementById('auth-result');
+    const authOutput = document.getElementById('auth-output');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const testLoginBtn = document.getElementById('test-login');
+    const loginResult = document.getElementById('login-result');
+    const loginOutput = document.getElementById('login-output');
+    
+    // Logging function
+    function log(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = type;
+      entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(`[${type}] ${message}`);
+    }
+    
+    // Clear log
+    function clearLog() {
+      logDiv.innerHTML = '';
+      log('Log cleared');
+    }
+    
+    // Test direct backend connection
+    directTestBtn.addEventListener('click', async () => {
+      log('Testing direct backend connection...');
+      directOutput.textContent = 'Testing...';
+      directResult.style.display = 'block';
+      
+      try {
+        // Try to connect to the backend health endpoint with credentials
+        const response = await fetch(`${API_URL}/health`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          log('Direct backend connection successful', 'success');
+          directOutput.textContent = JSON.stringify(data, null, 2);
+        } else {
+          // If we get a 401, try to extract the Vercel authentication URL
+          const text = await response.text();
+          let authUrl = '';
+          
+          try {
+            // Extract the authentication URL from the HTML response
+            const match = text.match(/window\.location\.href=\"([^\"]+)\"/i);
+            if (match && match[1]) {
+              authUrl = match[1];
+              log(`Found Vercel authentication URL: ${authUrl}`, 'info');
+            }
+          } catch (parseError) {
+            console.error('Error parsing authentication URL:', parseError);
+          }
+          
+          log(`Direct backend connection failed: ${response.status}`, 'error');
+          directOutput.textContent = `Status: ${response.status}\n\n`;
+          directOutput.textContent += authUrl ? `Authentication URL: ${authUrl}\n\n` : '';
+          directOutput.textContent += text.substring(0, 500) + '...';
+        }
+      } catch (error) {
+        log(`Direct backend connection error: ${error.message}`, 'error');
+        directOutput.textContent = `Error: ${error.message}`;
+      }
+    });
+    
+    // Check authentication status
+    checkAuthBtn.addEventListener('click', () => {
+      log('Checking authentication status...');
+      authOutput.textContent = 'Checking...';
+      authResult.style.display = 'block';
+      
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      
+      if (token) {
+        log('Authentication token found', 'success');
+        
+        // Parse the JWT token
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const expDate = new Date(payload.exp * 1000);
+          const isExpired = expDate < new Date();
+          
+          authOutput.textContent = `Token found: ${token.substring(0, 20)}...\n\n`;
+          authOutput.textContent += `Expires: ${expDate.toLocaleString()}\n`;
+          authOutput.textContent += `Status: ${isExpired ? 'EXPIRED' : 'VALID'}\n\n`;
+          authOutput.textContent += `Payload:\n${JSON.stringify(payload, null, 2)}`;
+          
+          if (isExpired) {
+            log('Authentication token is expired', 'error');
+          }
+        } catch (error) {
+          authOutput.textContent = `Token found but could not be parsed: ${token.substring(0, 20)}...\n\nError: ${error.message}`;
+          log('Authentication token found but invalid format', 'error');
+        }
+      } else {
+        log('No authentication token found', 'error');
+        authOutput.textContent = 'No authentication token found in localStorage.';
+      }
+    });
+    
+    // Test login
+    testLoginBtn.addEventListener('click', async () => {
+      log('Testing login...');
+      loginOutput.textContent = 'Testing...';
+      loginResult.style.display = 'block';
+      
+      const email = emailInput.value;
+      const password = passwordInput.value;
+      
+      if (!email || !password) {
+        loginOutput.textContent = 'Please enter email and password';
+        log('Login test failed: Missing email or password', 'error');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ email, password })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.token) {
+            localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+            log('Login successful, token saved', 'success');
+            loginOutput.textContent = `Login successful!\n\nToken: ${data.token.substring(0, 20)}...\n\nFull response:\n${JSON.stringify(data, null, 2)}`;
+          } else {
+            log('Login response missing token', 'error');
+            loginOutput.textContent = `Login response missing token:\n${JSON.stringify(data, null, 2)}`;
+          }
+        } else {
+          // Try to get error details
+          let errorText = '';
+          try {
+            const errorData = await response.json();
+            errorText = JSON.stringify(errorData, null, 2);
+          } catch (e) {
+            errorText = await response.text();
+          }
+          
+          log(`Login failed: ${response.status}`, 'error');
+          loginOutput.textContent = `Login failed with status ${response.status}:\n\n${errorText}`;
+        }
+      } catch (error) {
+        log(`Login error: ${error.message}`, 'error');
+        loginOutput.textContent = `Error: ${error.message}`;
+      }
+    });
+    
+    // Initialize
+    log('Connection test page loaded', 'info');
+    log(`API URL: ${API_URL}`, 'info');
+    
+    // Check if token exists on load
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (token) {
+      log('Authentication token found in localStorage', 'info');
+    } else {
+      log('No authentication token found in localStorage', 'info');
+    }
+  </script>
+</body>
+</html>
