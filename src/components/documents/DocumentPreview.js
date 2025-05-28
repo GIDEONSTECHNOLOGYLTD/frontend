@@ -75,7 +75,6 @@ const DocumentPreview = ({
   onDownload,
   onEdit,
   onDelete,
-  onShare,
   onDocumentUpdated
 }) => {
   const [tabValue, setTabValue] = useState(0);
