@@ -1,8 +1,8 @@
 {
-  "name": "frontend",
-  "version": "0.1.0",
-  "homepage": ".",
-  "proxy": "https://gideons-tech-suite.onrender.com",
+  "name": "gideons-tech-suite-frontend",
+  "version": "1.0.0",
+  "homepage": "https://frontend-t73t.onrender.com",
+  "proxy": "https://gideons-tech-suite-api.vercel.app",
   "private": true,
   "resolutions": {
     "ajv": "6.12.6",
