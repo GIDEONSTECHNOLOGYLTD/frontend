@@ -1,8 +1,8 @@
 {
   "name": "gideons-tech-suite-frontend",
   "version": "1.0.0",
-  "homepage": ".",
-  "proxy": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app",
+  "homepage": "/",
+  "proxy": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/",
   "private": true,
   "resolutions": {
     "ajv": "6.12.6",
@@ -39,13 +39,16 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "GENERATE_SOURCEMAP=false react-scripts start",
-    "build": "GENERATE_SOURCEMAP=false PUBLIC_URL=/ react-scripts build",
+    "start": "react-scripts start",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
+    "vercel-build": "bash vercel-build.sh",
     "lint": "eslint src --ext .js,.jsx",
-    "vercel-build": "npm run build",
     "format": "prettier --write \"src/**/*.{js,jsx,json,md}\""
+  },
+  "engines": {
+    "node": ">=16.0.0"
   },
   "eslintConfig": {
     "extends": [

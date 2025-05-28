@@ -1,44 +1,35 @@
 {
   "version": 2,
   "builds": [
-    { "src": "package.json", "use": "@vercel/static-build" }
-  ],
-  "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/static/$1"
-    },
-    {
-      "src": "^/favicon.ico$",
-      "dest": "/favicon.ico"
-    },
-    {
-      "src": "^/logo(.*).png$",
-      "dest": "/logo$1.png"
-    },
-    {
-      "src": "^/manifest.json$",
-      "dest": "/manifest.json"
-    },
-    {
-      "src": "^/asset-manifest.json$",
-      "dest": "/asset-manifest.json"
-    },
-    {
-      "src": "^/api/(.*)",
-      "dest": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api/$1"
-    },
-    {
-      "src": "^/ws$",
-      "dest": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws"
-    },
-    {
-      "src": "^/(.*)",
-      "dest": "/index.html"
+    { 
+      "src": "package.json", 
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
     }
   ],
-  "env": {
-    "REACT_APP_API_URL": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api",
-    "REACT_APP_WS_URL": "wss://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws"
-  }
+  "build": {
+    "env": {
+      "PUBLIC_URL": "/",
+      "REACT_APP_API_URL": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api",
+      "REACT_APP_WS_URL": "wss://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws"
+    }
+  },
+  "routes": [
+    { "src": "/static/(.*)", "dest": "/static/$1" },
+    { "src": "/favicon.ico", "dest": "/favicon.ico" },
+    { "src": "/logo(.*)", "dest": "/logo$1" },
+    { "src": "/manifest.json", "dest": "/manifest.json" },
+    { "src": "/asset-manifest.json", "dest": "/asset-manifest.json" },
+    { 
+      "src": "^/api/(.*)", 
+      "dest": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/api/$1" 
+    },
+    { 
+      "src": "^/ws", 
+      "dest": "https://backend-7ck9fowyc-gideonstechnologyltds-projects.vercel.app/ws" 
+    },
+    { "src": "^/(.*)", "dest": "/index.html" }
+  ]
 }
