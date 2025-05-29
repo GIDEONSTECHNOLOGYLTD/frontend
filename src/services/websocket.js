@@ -43,7 +43,7 @@ class WebSocketService {
       }
       
       try {
-        const wsUrl = process.env.REACT_APP_WS_URL || 'wss://backend-4ptp8fu9r-gideonstechnologyltds-projects.vercel.app/ws';
+        const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:5000/ws';
         
         console.log(`[WebSocket] Connecting to ${wsUrl}`);
         this.socket = new WebSocket(wsUrl);

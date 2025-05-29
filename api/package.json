@@ -1,8 +1,0 @@
-{
-  "name": "gideons-tech-suite-frontend-api",
-  "version": "1.0.0",
-  "description": "API functions for Gideon's Tech Suite Frontend",
-  "dependencies": {
-    "mongoose": "^8.0.3"
-  }
-}
